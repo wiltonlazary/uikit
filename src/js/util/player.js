@@ -100,6 +100,7 @@ export class Player {
         if (this.isIFrame()) {
             this.enableApi().then(() => post(this.el, {func: 'mute', method: 'setVolume', value: 0}))
         } else if (this.isHTML5()) {
+            this.el.muted = true;
             this.el.setAttribute('muted', '');
         }
 
@@ -108,14 +109,16 @@ export class Player {
 }
 
 function post(el, cmd) {
-    el.contentWindow.postMessage(JSON.stringify(assign({event: 'command'}, cmd)), '*');
+    try {
+        el.contentWindow.postMessage(JSON.stringify(assign({event: 'command'}, cmd)), '*');
+    } catch (e) {}
 }
 
 function listen(cb) {
 
     return promise(resolve => {
 
-        one(window, 'message', data => resolve(data), false, ({data}) => {
+        one(window, 'message', (_, data) => resolve(data), false, ({data}) => {
 
             if (!data || !isString(data)) {
                 return;
