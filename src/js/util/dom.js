@@ -1,379 +1,185 @@
-import $ from 'jquery';
-import { animationend, assign, clamp, each, Event, getContextSelectors, isNumber, isString, promise, requestAnimationFrame, toJQuery, toNode, transitionend } from './index';
-
-var docEl = document.documentElement;
-export const win = $(window);
-export const doc = $(document);
-export const docElement = $(docEl);
-
-export const isRtl = docEl.getAttribute('dir') === 'rtl';
-
-export function isReady() {
-    return document.readyState === 'complete' || document.readyState !== 'loading' && !docEl.doScroll;
-}
+import {on} from './event';
+import {find, findAll} from './selector';
+import {clamp, isNumeric, isString, isUndefined, toNode, toNodes, toNumber} from './lang';
 
 export function ready(fn) {
 
-    var handle = function () {
-        off(document, 'DOMContentLoaded', handle);
-        off(window, 'load', handle);
+    if (document.readyState !== 'loading') {
         fn();
-    };
+        return;
+    }
 
-    if (isReady()) {
+    const unbind = on(document, 'DOMContentLoaded', function () {
+        unbind();
         fn();
-    } else {
-        on(document, 'DOMContentLoaded', handle);
-        on(window, 'load', handle);
-    }
-
-}
-
-export function on(el, type, listener, useCapture = false) {
-    type.split(' ').forEach(type => toNode(el).addEventListener(type, listener, useCapture));
-}
-
-export function off(el, type, listener, useCapture = false) {
-    type.split(' ').forEach(type => toNode(el).removeEventListener(type, listener, useCapture));
-}
-
-export function one(el, type, listener, useCapture, condition) {
-
-    var handler = e => {
-        var result = !condition || condition(e);
-        if (result) {
-            off(el, type, handler, useCapture);
-            listener(e, result);
-        }
-    };
-
-    on(el, type, handler, useCapture);
-}
-
-export function trigger(element, event) {
-    var e = createEvent(event);
-    toNode(element).dispatchEvent(e);
-    return e;
-}
-
-export function $trigger(element, event, data, local = false) {
-    var e = event instanceof Event ? event : Event(event);
-    $(element)[local ? 'triggerHandler' : 'trigger'](e, data);
-    return e;
-}
-
-var transitioncancel = 'transitioncancel';
-export function transition(element, props, duration = 400, transition = 'linear') {
-
-    return promise((resolve, reject) => {
-
-        element = $(element);
-
-        for (var name in props) {
-            element.css(name, element.css(name));
-        }
-
-        var timer = setTimeout(() => element.trigger(transitionend), duration);
-
-        one(element, `${transitionend} ${transitioncancel}`, ({type}) => {
-            clearTimeout(timer);
-            element.removeClass('uk-transition').css('transition', '');
-            type === transitioncancel ? reject() : resolve();
-        }, false, ({target}) => element.is(target));
-
-        element
-            .addClass('uk-transition')
-            .css('transition', `all ${duration}ms ${transition}`)
-            .css(props);
-
     });
-
 }
 
-export const Transition = {
-
-    start: transition,
-
-    stop(element) {
-        trigger(element, transitionend);
-        return promise.resolve();
-    },
-
-    cancel(element) {
-        trigger(element, transitioncancel);
-        return promise.resolve();
-    },
-
-    inProgress(element) {
-        return $(element).hasClass('uk-transition');
-    }
-
-};
-
-var animationcancel = 'animationcancel',
-    animationprefix = 'uk-animation-',
-    clsCancelAnimation = 'uk-cancel-animation';
-export function animate(element, animation, duration = 200, origin, out) {
-
-    return promise((resolve, reject) => {
-
-        element = $(element);
-
-        if (element.hasClass(clsCancelAnimation)) {
-            requestAnimationFrame(() =>
-                promise.resolve().then(() =>
-                    animate.apply(null, arguments).then(resolve, reject)
-                )
-            );
-            return;
-        }
-
-        var cls = `${animation} ${animationprefix}${out ? 'leave' : 'enter'}`;
-
-        if (animation.lastIndexOf(animationprefix, 0) === 0) {
-
-            if (origin) {
-                cls += ` ${animationprefix}${origin}`;
-            }
-
-            if (out) {
-                cls += ` ${animationprefix}reverse`;
-            }
-
-        }
-
-        reset();
-
-        one(element, `${animationend || 'animationend'} ${animationcancel}`, ({type}) => {
-
-            var hasReset = false;
-
-            type === animationcancel ? reject() : resolve();
-
-            requestAnimationFrame(() => {
-                if (!hasReset) {
-                    element.addClass(clsCancelAnimation);
-
-                    requestAnimationFrame(() => element.removeClass(clsCancelAnimation));
-                }
-            });
-
-            promise.resolve().then(() => {
-                hasReset = true;
-                reset();
-            });
-
-        }, false, ({target}) => element.is(target));
-
-        element
-            .css('animation-duration', `${duration}ms`)
-            .addClass(cls);
-
-        if (!animationend) {
-            requestAnimationFrame(() => Animation.cancel(element));
-        }
-
-        function reset() {
-            element.css('animation-duration', '');
-            removeClass(element, `${animationprefix}\\S*`);
-        }
-
-    });
-
+export function index(element, ref) {
+    return ref
+        ? toNodes(element).indexOf(toNode(ref))
+        : toNodes((element = toNode(element)) && element.parentNode.children).indexOf(element);
 }
 
-var inProgress = new RegExp(`${animationprefix}(enter|leave)`);
-export const Animation = {
+export function getIndex(i, elements, current = 0, finite = false) {
 
-    in(element, animation, duration, origin) {
-        return animate(element, animation, duration, origin, false);
-    },
+    elements = toNodes(elements);
 
-    out(element, animation, duration, origin) {
-        return animate(element, animation, duration, origin, true);
-    },
+    const {length} = elements;
 
-    inProgress(element) {
-        return inProgress.test($(element).attr('class'));
-    },
-
-    cancel(element) {
-        trigger(element, animationcancel);
-        return promise.resolve();
-    }
-
-};
-
-export function isJQuery(obj) {
-    return obj instanceof $;
-}
-
-export function isWithin(element, selector) {
-    element = $(element);
-    return element.is(selector)
-        ? true
-        : isString(selector)
-            ? element.parents(selector).length
-            : toNode(selector).contains(element[0]);
-}
-
-export function attrFilter(element, attr, pattern, replacement) {
-    element = $(element);
-    return element.attr(attr, (i, value) => value ? value.replace(pattern, replacement) : value);
-}
-
-export function removeClass(element, cls) {
-    return attrFilter(element, 'class', new RegExp(`(^|\\s)${cls}(?!\\S)`, 'g'), '');
-}
-
-export function createEvent(e, bubbles = true, cancelable = false, data = false) {
-    if (isString(e)) {
-        var event = document.createEvent('Event');
-        event.initEvent(e, bubbles, cancelable);
-        e = event;
-    }
-
-    if (data) {
-        assign(e, data);
-    }
-
-    return e;
-}
-
-export function isInView(element, offsetTop = 0, offsetLeft = 0) {
-
-    var rect = toNode(element).getBoundingClientRect();
-
-    return rect.bottom >= -1 * offsetTop
-        && rect.right >= -1 * offsetLeft
-        && rect.top <= window.innerHeight + offsetTop
-        && rect.left <= window.innerWidth + offsetLeft;
-}
-
-export function scrolledOver(element) {
-
-    element = toNode(element);
-
-    var height = element.offsetHeight,
-        top = positionTop(element),
-        vp = window.innerHeight,
-        vh = vp + Math.min(0, top - vp),
-        diff = Math.max(0, vp - (docHeight() - (top + height)));
-
-    return clamp(((vh + window.pageYOffset - top) / ((vh + (height - (diff < vp ? diff : 0)) ) / 100)) / 100);
-}
-
-function positionTop(element) {
-    var top = 0;
-
-    do {
-
-        top += element.offsetTop;
-
-    } while (element = element.offsetParent);
-
-    return top;
-}
-
-export function docHeight() {
-    return Math.max(docEl.offsetHeight, docEl.scrollHeight);
-}
-
-export function getIndex(index, elements, current = 0) {
-
-    elements = $(elements);
-
-    var length = $(elements).length;
-
-    index = (isNumber(index)
-        ? index
-        : index === 'next'
+    i = isNumeric(i)
+        ? toNumber(i)
+        : i === 'next'
             ? current + 1
-            : index === 'previous'
+            : i === 'previous'
                 ? current - 1
-                : isString(index)
-                    ? parseInt(index, 10)
-                    : elements.index(index)
-    ) % length;
+                : index(elements, i);
 
-    return index < 0 ? index + length : index;
-}
-
-var voidElements = {
-    area: true,
-    base: true,
-    br: true,
-    col: true,
-    embed: true,
-    hr: true,
-    img: true,
-    input: true,
-    keygen: true,
-    link: true,
-    menuitem: true,
-    meta: true,
-    param: true,
-    source: true,
-    track: true,
-    wbr: true
-};
-export function isVoidElement(element) {
-    return voidElements[toNode(element).tagName.toLowerCase()];
-}
-
-export const Dimensions = {
-
-    ratio(dimensions, prop, value) {
-
-        var aProp = prop === 'width' ? 'height' : 'width';
-
-        return {
-            [aProp]: Math.round(value * dimensions[aProp] / dimensions[prop]),
-            [prop]: value
-        };
-    },
-
-    contain(dimensions, maxDimensions) {
-        dimensions = assign({}, dimensions);
-
-        each(dimensions, prop => dimensions = dimensions[prop] > maxDimensions[prop] ? this.ratio(dimensions, prop, maxDimensions[prop]) : dimensions);
-
-        return dimensions;
-    },
-
-    cover(dimensions, maxDimensions) {
-        dimensions = this.contain(dimensions, maxDimensions);
-
-        each(dimensions, prop => dimensions = dimensions[prop] < maxDimensions[prop] ? this.ratio(dimensions, prop, maxDimensions[prop]) : dimensions);
-
-        return dimensions;
+    if (finite) {
+        return clamp(i, 0, length - 1);
     }
 
-};
+    i %= length;
 
-export function query(selector, context) {
-    var selectors = getContextSelectors(selector);
-    return selectors ? selectors.reduce((context, selector) => toJQuery(selector, context), context) : toJQuery(selector);
+    return i < 0 ? i + length : i;
 }
 
-export function preventClick() {
-
-    var timer = setTimeout(() => trigger(doc, 'click'), 0);
-
-    one(doc, 'click', e => {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-
-        clearTimeout(timer);
-    }, true);
-
+export function empty(element) {
+    element = $(element);
+    element.innerHTML = '';
+    return element;
 }
 
-export function getData(el, attribute) {
-    el = toNode(el);
-    for (var i = 0, attrs = [attribute, `data-${attribute}`]; i < attrs.length; i++) {
-        if (el.hasAttribute(attrs[i])) {
-            return el.getAttribute(attrs[i]);
-        }
+export function html(parent, html) {
+    parent = $(parent);
+    return isUndefined(html)
+        ? parent.innerHTML
+        : append(parent.hasChildNodes() ? empty(parent) : parent, html);
+}
+
+export function prepend(parent, element) {
+
+    parent = $(parent);
+
+    if (!parent.hasChildNodes()) {
+        return append(parent, element);
+    } else {
+        return insertNodes(element, element => parent.insertBefore(element, parent.firstChild));
     }
 }
+
+export function append(parent, element) {
+    parent = $(parent);
+    return insertNodes(element, element => parent.appendChild(element));
+}
+
+export function before(ref, element) {
+    ref = $(ref);
+    return insertNodes(element, element => ref.parentNode.insertBefore(element, ref));
+}
+
+export function after(ref, element) {
+    ref = $(ref);
+    return insertNodes(element, element => ref.nextSibling
+        ? before(ref.nextSibling, element)
+        : append(ref.parentNode, element)
+    );
+}
+
+function insertNodes(element, fn) {
+    element = isString(element) ? fragment(element) : element;
+    return element
+        ? 'length' in element
+            ? toNodes(element).map(fn)
+            : fn(element)
+        : null;
+}
+
+export function remove(element) {
+    toNodes(element).map(element => element.parentNode && element.parentNode.removeChild(element));
+}
+
+export function wrapAll(element, structure) {
+
+    structure = toNode(before(element, structure));
+
+    while (structure.firstChild) {
+        structure = structure.firstChild;
+    }
+
+    append(structure, element);
+
+    return structure;
+}
+
+export function wrapInner(element, structure) {
+    return toNodes(toNodes(element).map(element =>
+        element.hasChildNodes ? wrapAll(toNodes(element.childNodes), structure) : append(element, structure)
+    ));
+}
+
+export function unwrap(element) {
+    toNodes(element)
+        .map(element => element.parentNode)
+        .filter((value, index, self) => self.indexOf(value) === index)
+        .forEach(parent => {
+            before(parent, parent.childNodes);
+            remove(parent);
+        });
+}
+
+const fragmentRe = /^\s*<(\w+|!)[^>]*>/;
+const singleTagRe = /^<(\w+)\s*\/?>(?:<\/\1>)?$/;
+
+export function fragment(html) {
+
+    const matches = singleTagRe.exec(html);
+    if (matches) {
+        return document.createElement(matches[1]);
+    }
+
+    const container = document.createElement('div');
+    if (fragmentRe.test(html)) {
+        container.insertAdjacentHTML('beforeend', html.trim());
+    } else {
+        container.textContent = html;
+    }
+
+    return container.childNodes.length > 1 ? toNodes(container.childNodes) : container.firstChild;
+
+}
+
+export function apply(node, fn) {
+
+    if (!node || node.nodeType !== 1) {
+        return;
+    }
+
+    fn(node);
+    node = node.firstElementChild;
+    while (node) {
+        apply(node, fn);
+        node = node.nextElementSibling;
+    }
+}
+
+export function $(selector, context) {
+    return !isString(selector)
+        ? toNode(selector)
+        : isHtml(selector)
+            ? toNode(fragment(selector))
+            : find(selector, context);
+}
+
+export function $$(selector, context) {
+    return !isString(selector)
+        ? toNodes(selector)
+        : isHtml(selector)
+            ? toNodes(fragment(selector))
+            : findAll(selector, context);
+}
+
+function isHtml(str) {
+    return str[0] === '<' || str.match(/^\s*</);
+}
+

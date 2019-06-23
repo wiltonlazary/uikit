@@ -1,23 +1,22 @@
+import {Promise} from './promise';
 /*
     Based on:
     Copyright (c) 2016 Wilson Page wilsonpage@me.com
     https://github.com/wilsonpage/fastdom
 */
 
-import { requestAnimationFrame } from './index';
-
 export const fastdom = {
 
     reads: [],
     writes: [],
 
-    measure(task) {
+    read(task) {
         this.reads.push(task);
         scheduleFlush();
         return task;
     },
 
-    mutate(task) {
+    write(task) {
         this.writes.push(task);
         scheduleFlush();
         return task;
@@ -27,36 +26,40 @@ export const fastdom = {
         return remove(this.reads, task) || remove(this.writes, task);
     },
 
-    flush() {
-
-        runTasks(this.reads);
-        runTasks(this.writes.splice(0, this.writes.length));
-
-        this.scheduled = false;
-
-        if (this.reads.length || this.writes.length) {
-            scheduleFlush();
-        }
-
-    }
+    flush
 
 };
 
-function scheduleFlush() {
+function flush() {
+    runTasks(fastdom.reads);
+    runTasks(fastdom.writes.splice(0, fastdom.writes.length));
+
+    fastdom.scheduled = false;
+
+    if (fastdom.reads.length || fastdom.writes.length) {
+        scheduleFlush(true);
+    }
+}
+
+function scheduleFlush(microtask = false) {
     if (!fastdom.scheduled) {
         fastdom.scheduled = true;
-        requestAnimationFrame(fastdom.flush.bind(fastdom));
+        if (microtask) {
+            Promise.resolve().then(flush);
+        } else {
+            requestAnimationFrame(flush);
+        }
     }
 }
 
 function runTasks(tasks) {
-    var task;
-    while (task = tasks.shift()) {
+    let task;
+    while ((task = tasks.shift())) {
         task();
     }
 }
 
 function remove(array, item) {
-    var index = array.indexOf(item);
+    const index = array.indexOf(item);
     return !!~index && !!array.splice(index, 1);
 }

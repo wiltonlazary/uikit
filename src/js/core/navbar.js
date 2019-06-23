@@ -1,205 +1,240 @@
-import { Class } from '../mixin/index';
-import { $, assign, isRtl, isWithin, noop, pointerEnter, query, Transition } from '../util/index';
+import Class from '../mixin/class';
+import FlexBug from '../mixin/flex-bug';
+import {$, $$, addClass, after, assign, css, height, includes, isRtl, isVisible, matches, noop, Promise, query, remove, toFloat, Transition, within} from 'uikit-util';
 
-export default function (UIkit) {
+export default {
 
-    UIkit.component('navbar', {
+    mixins: [Class, FlexBug],
 
-        mixins: [Class],
+    props: {
+        dropdown: String,
+        mode: 'list',
+        align: String,
+        offset: Number,
+        boundary: Boolean,
+        boundaryAlign: Boolean,
+        clsDrop: String,
+        delayShow: Number,
+        delayHide: Number,
+        dropbar: Boolean,
+        dropbarMode: String,
+        dropbarAnchor: Boolean,
+        duration: Number
+    },
 
-        props: {
-            dropdown: String,
-            mode: 'list',
-            align: String,
-            offset: Number,
-            boundary: Boolean,
-            boundaryAlign: Boolean,
-            clsDrop: String,
-            delayShow: Number,
-            delayHide: Number,
-            dropbar: Boolean,
-            dropbarMode: String,
-            dropbarAnchor: 'jQuery',
-            duration: Number
+    data: {
+        dropdown: '.uk-navbar-nav > li',
+        align: !isRtl ? 'left' : 'right',
+        clsDrop: 'uk-navbar-dropdown',
+        mode: undefined,
+        offset: undefined,
+        delayShow: undefined,
+        delayHide: undefined,
+        boundaryAlign: undefined,
+        flip: 'x',
+        boundary: true,
+        dropbar: false,
+        dropbarMode: 'slide',
+        dropbarAnchor: false,
+        duration: 200,
+        forceHeight: true,
+        selMinHeight: '.uk-navbar-nav > li > a, .uk-navbar-item, .uk-navbar-toggle'
+    },
+
+    computed: {
+
+        boundary({boundary, boundaryAlign}, $el) {
+            return (boundary === true || boundaryAlign) ? $el : boundary;
         },
 
-        defaults: {
-            dropdown: '.uk-navbar-nav > li',
-            align: !isRtl ? 'left' : 'right',
-            clsDrop: 'uk-navbar-dropdown',
-            mode: undefined,
-            offset: undefined,
-            delayShow: undefined,
-            delayHide: undefined,
-            boundaryAlign: undefined,
-            flip: 'x',
-            boundary: true,
-            dropbar: false,
-            dropbarMode: 'slide',
-            dropbarAnchor: false,
-            duration: 200,
+        dropbarAnchor({dropbarAnchor}, $el) {
+            return query(dropbarAnchor, $el);
         },
 
-        computed: {
-
-            boundary() {
-                return (this.$props.boundary === true || this.boundaryAlign) ? this.$el : this.$props.boundary
-            },
-
-            pos() {
-                return `bottom-${this.align}`;
-            }
-
+        pos({align}) {
+            return `bottom-${align}`;
         },
 
-        ready() {
-
-            if (this.dropbar) {
-                UIkit.navbarDropbar(
-                    query(this.dropbar, this.$el) || $('<div></div>').insertAfter(this.dropbarAnchor || this.$el),
-                    {clsDrop: this.clsDrop, mode: this.dropbarMode, duration: this.duration, navbar: this}
-                );
-            }
-
-        },
-
-        update() {
-
-            UIkit.drop(
-                $(`${this.dropdown} .${this.clsDrop}`, this.$el).filter((_, el) => !UIkit.getComponent(el, 'dropdown')),
-                assign({}, this.$props, {boundary: this.boundary, pos: this.pos})
-            );
-
-        },
-
-        events: [
-
-            {
-                name: pointerEnter,
-
-                delegate() {
-                    return this.dropdown;
-                },
-
-                handler({currentTarget}) {
-                    var active = this.getActive();
-                    if (active && active.toggle && !isWithin(active.toggle.$el, currentTarget) && !active.tracker.movesTo(active.$el)) {
-                        active.hide(false);
-                    }
-                }
-
-            }
-
-        ],
-
-        methods: {
-
-            getActive() {
-                var active = UIkit.drop.getActive();
-                return active && !~active.mode.indexOf('click') && isWithin(active.toggle.$el, this.$el) && active;
-            }
-
+        dropdowns({dropdown, clsDrop}, $el) {
+            return $$(`${dropdown} .${clsDrop}`, $el);
         }
 
-    });
+    },
 
-    UIkit.component('navbar-dropbar', {
+    beforeConnect() {
 
-        mixins: [Class],
+        const {dropbar} = this.$props;
 
-        defaults: {
-            clsDrop: '',
-            mode: 'slide',
-            navbar: null,
-            duration: 200
-        },
+        this.dropbar = dropbar && (query(dropbar, this.$el) || $('+ .uk-navbar-dropbar', this.$el) || $('<div></div>'));
 
-        init() {
+        if (this.dropbar) {
 
-            if (this.mode === 'slide') {
-                this.$addClass('uk-navbar-dropbar-slide');
+            addClass(this.dropbar, 'uk-navbar-dropbar');
+
+            if (this.dropbarMode === 'slide') {
+                addClass(this.dropbar, 'uk-navbar-dropbar-slide');
             }
-
-        },
-
-        events: [
-
-            {
-                name: 'beforeshow',
-
-                el() {
-                    return this.navbar.$el;
-                },
-
-                handler(_, drop) {
-                    var {$el, dir} = drop;
-                    if (dir === 'bottom' && !isWithin($el, this.$el)) {
-                        $el.appendTo(this.$el);
-                        drop.show();
-                        return false;
-                    }
-                }
-            },
-
-            {
-                name: 'mouseleave',
-
-                handler() {
-                    var active = this.navbar.getActive();
-
-                    if (active && !this.$el.is(':hover')) {
-                        active.hide();
-                    }
-                }
-            },
-
-            {
-                name: 'beforeshow',
-
-                handler(e, {$el}) {
-                    this.clsDrop && $el.addClass(`${this.clsDrop}-dropbar`);
-                    this.transitionTo($el.outerHeight(true));
-                }
-            },
-
-            {
-                name: 'beforehide',
-
-                handler(e, {$el}) {
-
-                    var active = this.navbar.getActive();
-
-                    if (this.$el.is(':hover') && active && active.$el.is($el)) {
-                        return false;
-                    }
-                }
-            },
-
-            {
-                name: 'hide',
-
-                handler(e, {$el}) {
-
-                    var active = this.navbar.getActive();
-
-                    if (!active || active && active.$el.is($el)) {
-                        this.transitionTo(0);
-                    }
-                }
-            }
-
-        ],
-
-        methods: {
-
-            transitionTo(height) {
-                this.$el.height(this.$el[0].offsetHeight ? this.$el.height() : 0);
-                Transition.cancel(this.$el);
-                return Transition.start(this.$el, {height}, this.duration).then(null, noop);
-            }
-
         }
 
-    });
+    },
 
-}
+    disconnected() {
+        this.dropbar && remove(this.dropbar);
+    },
+
+    update() {
+
+        this.$create(
+            'drop',
+            this.dropdowns.filter(el => !this.getDropdown(el)),
+            assign({}, this.$props, {boundary: this.boundary, pos: this.pos, offset: this.dropbar || this.offset})
+        );
+
+    },
+
+    events: [
+
+        {
+            name: 'mouseover',
+
+            delegate() {
+                return this.dropdown;
+            },
+
+            handler({current}) {
+                const active = this.getActive();
+                if (active && active.toggle && !within(active.toggle.$el, current) && !active.tracker.movesTo(active.$el)) {
+                    active.hide(false);
+                }
+            }
+
+        },
+
+        {
+            name: 'mouseleave',
+
+            el() {
+                return this.dropbar;
+            },
+
+            handler() {
+                const active = this.getActive();
+
+                if (active && !this.dropdowns.some(el => matches(el, ':hover'))) {
+                    active.hide();
+                }
+            }
+        },
+
+        {
+            name: 'beforeshow',
+
+            capture: true,
+
+            filter() {
+                return this.dropbar;
+            },
+
+            handler() {
+
+                if (!this.dropbar.parentNode) {
+                    after(this.dropbarAnchor || this.$el, this.dropbar);
+                }
+
+            }
+        },
+
+        {
+            name: 'show',
+
+            capture: true,
+
+            filter() {
+                return this.dropbar;
+            },
+
+            handler(_, drop) {
+
+                const {$el, dir} = drop;
+
+                this.clsDrop && addClass($el, `${this.clsDrop}-dropbar`);
+
+                if (dir === 'bottom') {
+                    this.transitionTo($el.offsetHeight + toFloat(css($el, 'marginTop')) + toFloat(css($el, 'marginBottom')), $el);
+                }
+            }
+        },
+
+        {
+            name: 'beforehide',
+
+            filter() {
+                return this.dropbar;
+            },
+
+            handler(e, {$el}) {
+
+                const active = this.getActive();
+
+                if (matches(this.dropbar, ':hover') && active && active.$el === $el) {
+                    e.preventDefault();
+                }
+            }
+        },
+
+        {
+            name: 'hide',
+
+            filter() {
+                return this.dropbar;
+            },
+
+            handler(_, {$el}) {
+
+                const active = this.getActive();
+
+                if (!active || active && active.$el === $el) {
+                    this.transitionTo(0);
+                }
+            }
+        }
+
+    ],
+
+    methods: {
+
+        getActive() {
+            const [active] = this.dropdowns.map(this.getDropdown).filter(drop => drop && drop.isActive());
+            return active && includes(active.mode, 'hover') && within(active.toggle.$el, this.$el) && active;
+        },
+
+        transitionTo(newHeight, el) {
+
+            const {dropbar} = this;
+            const oldHeight = isVisible(dropbar) ? height(dropbar) : 0;
+
+            el = oldHeight < newHeight && el;
+
+            css(el, 'clip', `rect(0,${el.offsetWidth}px,${oldHeight}px,0)`);
+
+            height(dropbar, oldHeight);
+
+            Transition.cancel([el, dropbar]);
+            return Promise.all([
+                Transition.start(dropbar, {height: newHeight}, this.duration),
+                Transition.start(el, {clip: `rect(0,${el.offsetWidth}px,${newHeight}px,0)`}, this.duration)
+            ])
+                .catch(noop)
+                .then(() => {
+                    css(el, {clip: ''});
+                    this.$update(dropbar);
+                });
+        },
+
+        getDropdown(el) {
+            return this.$getComponent(el, 'drop') || this.$getComponent(el, 'dropdown');
+        }
+
+    }
+
+};

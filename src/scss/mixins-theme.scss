@@ -4,28 +4,31 @@
 
     overflow: hidden;
 
-    &::after {
+    &::before {
         content: "";
         width: ($accordion-title-line-height * 1em);
         height: ($accordion-title-line-height * 1em);
+        margin-left: $accordion-icon-margin-left;
         float: right;
         @include svg-fill($internal-accordion-close-image, "#000", $accordion-icon-color);
         background-repeat: no-repeat;
         background-position: 50% 50%;
     }
 
-    .uk-open > &::after { @include svg-fill($internal-accordion-open-image, "#000", $accordion-icon-color); }
+    .uk-open > &::before { @include svg-fill($internal-accordion-open-image, "#000", $accordion-icon-color); }
 
 }
+@mixin hook-accordion-title-hover(){}
 @mixin hook-accordion-content(){}
 @mixin hook-accordion-misc(){}
 @mixin hook-inverse-accordion-item(){}
 @mixin hook-inverse-accordion-title(){}
+@mixin hook-inverse-accordion-title-hover(){}
 @mixin hook-inverse-component-accordion(){
 
-    .uk-accordion-title::after { @include svg-fill($internal-accordion-close-image, "#000", $inverse-global-color); }
+    .uk-accordion-title::before { @include svg-fill($internal-accordion-close-image, "#000", $inverse-global-color); }
 
-    .uk-open > .uk-accordion-title::after { @include svg-fill($internal-accordion-open-image, "#000", $inverse-global-color); }
+    .uk-open > .uk-accordion-title::before { @include svg-fill($internal-accordion-open-image, "#000", $inverse-global-color); }
 
 }
 @mixin hook-alert(){}
@@ -212,7 +215,12 @@
     h3, .uk-h3,
     h4, .uk-h4,
     h5, .uk-h5,
-    h6, .uk-h6 {
+    h6, .uk-h6,
+    .uk-heading-small,
+    .uk-heading-medium,
+    .uk-heading-large,
+    .uk-heading-xlarge,
+    .uk-heading-2xlarge {
         color: $inverse-base-heading-color;
         @if(mixin-exists(hook-inverse-base-heading)) {@include hook-inverse-base-heading();}
     }
@@ -257,7 +265,7 @@
     // Horizontal rules
     //
 
-    hr {
+    hr, .uk-hr {
         border-top-color: $inverse-base-hr-border;
         @if(mixin-exists(hook-inverse-base-hr)) {@include hook-inverse-base-hr();}
     }
@@ -310,9 +318,7 @@
 }
 @mixin hook-button(){
     text-transform: $button-text-transform;
-    -webkit-transition: 0.1s ease-in-out;
     transition: 0.1s ease-in-out;
-    -webkit-transition-property: color, background-color, border-color;
     transition-property: color, background-color, border-color;
 }
 @mixin hook-button-hover(){}
@@ -344,7 +350,6 @@
         left: 0;
         right: 100%;
         border-bottom: $button-text-border-width solid $button-text-border;
-        -webkit-transition: right 0.3s ease-out;
         transition: right 0.3s ease-out;
     }
 
@@ -511,34 +516,7 @@
 
 
 }
-@mixin hook-close(){
-    -webkit-transition: 0.1s ease-in-out;
-    transition: 0.1s ease-in-out;
-    -webkit-transition-property: color, opacity;
-    transition-property: color, opacity;
-}
-@mixin hook-close-hover(){}
-@mixin hook-close-misc(){}
-@mixin hook-inverse-close(){}
-@mixin hook-inverse-close-hover(){}
-@mixin hook-inverse-component-close(){
-
-    .uk-close {
-        color: $inverse-close-color;
-        @if(mixin-exists(hook-inverse-close)) {@include hook-inverse-close();}
-    }
-
-    .uk-close:hover,
-    .uk-close:focus {
-        color: $inverse-close-hover-color;
-        @if(mixin-exists(hook-inverse-close-hover)) {@include hook-inverse-close-hover();}
-    }
-
-}
-@mixin hook-card(){
-    -webkit-transition: box-shadow 0.1s ease-in-out;
-    transition: box-shadow 0.1s ease-in-out;
-}
+@mixin hook-card(){ transition: box-shadow 0.1s ease-in-out; }
 @mixin hook-card-body(){}
 @mixin hook-card-header(){}
 @mixin hook-card-footer(){}
@@ -567,8 +545,14 @@
      * Default
      */
 
-    .uk-card-body .uk-nav-default { margin: (-$card-body-padding-vertical + 15px) (-$card-body-padding-horizontal); }
-    .uk-card-title + .uk-nav-default { margin-top: 0; }
+    .uk-card-body > .uk-nav-default {
+        margin-left: (-$card-body-padding-horizontal);
+        margin-right: (-$card-body-padding-horizontal);
+    }
+    .uk-card-body > .uk-nav-default:only-child {
+        margin-top: (-$card-body-padding-vertical + 15px);
+        margin-bottom: (-$card-body-padding-vertical + 15px);
+    }
 
     .uk-card-body .uk-nav-default > li > a,
     .uk-card-body .uk-nav-default .uk-nav-header,
@@ -583,8 +567,14 @@
     /* Desktop and bigger */
     @media (min-width: $breakpoint-large) {
 
-        .uk-card-body .uk-nav-default { margin: (-$card-body-padding-vertical-l + 15px) (-$card-body-padding-horizontal-l); }
-        .uk-card-title + .uk-nav-default { margin-top: 0; }
+        .uk-card-body > .uk-nav-default {
+            margin-left: (-$card-body-padding-horizontal-l);
+            margin-right: (-$card-body-padding-horizontal-l);
+        }
+        .uk-card-body > .uk-nav-default:only-child {
+            margin-top: (-$card-body-padding-vertical-l + 15px);
+            margin-bottom: (-$card-body-padding-vertical-l + 15px);
+        }
 
         .uk-card-body .uk-nav-default > li > a,
         .uk-card-body .uk-nav-default .uk-nav-header,
@@ -601,8 +591,14 @@
      * Small
      */
 
-    .uk-card-small .uk-nav-default { margin: (-$card-small-body-padding-vertical + 15px) (-$card-small-body-padding-horizontal); }
-    .uk-card-small .uk-card-title + .uk-nav-default { margin-top: 0; }
+    .uk-card-small > .uk-nav-default {
+        margin-left: (-$card-small-body-padding-horizontal);
+        margin-right: (-$card-small-body-padding-horizontal);
+    }
+    .uk-card-small > .uk-nav-default:only-child {
+        margin-top: (-$card-small-body-padding-vertical + 15px);
+        margin-bottom: (-$card-small-body-padding-vertical + 15px);
+    }
 
     .uk-card-small .uk-nav-default > li > a,
     .uk-card-small .uk-nav-default .uk-nav-header,
@@ -620,20 +616,47 @@
     /* Desktop and bigger */
     @media (min-width: $breakpoint-large) {
 
-        .uk-card-large .uk-nav-default { margin: (-$card-large-body-padding-vertical-l + 15px) (-$card-large-body-padding-horizontal-l); }
-        .uk-card-large .uk-card-title + .uk-nav-default { margin-top: 0; }
+        .uk-card-large > .uk-nav-default { margin: 0; }
+        .uk-card-large > .uk-nav-default:only-child { margin: 0; }
 
+        .uk-card-large .uk-nav-default > li > a,
+        .uk-card-large .uk-nav-default .uk-nav-header,
+        .uk-card-large .uk-nav-default .uk-nav-divider {
+            padding-left: 0;
+            padding-right: 0;
+        }
+
+        .uk-card-large .uk-nav-default .uk-nav-sub { padding-left: $nav-sublist-deeper-padding-left; }
+
+    }
+
+}
+@mixin hook-close(){
+    transition: 0.1s ease-in-out;
+    transition-property: color, opacity;
+}
+@mixin hook-close-hover(){}
+@mixin hook-close-misc(){}
+@mixin hook-inverse-close(){}
+@mixin hook-inverse-close-hover(){}
+@mixin hook-inverse-component-close(){
+
+    .uk-close {
+        color: $inverse-close-color;
+        @if(mixin-exists(hook-inverse-close)) {@include hook-inverse-close();}
+    }
+
+    .uk-close:hover,
+    .uk-close:focus {
+        color: $inverse-close-hover-color;
+        @if(mixin-exists(hook-inverse-close-hover)) {@include hook-inverse-close-hover();}
     }
 
 }
 @mixin hook-column-misc(){}
 @mixin hook-inverse-component-column(){
 
-    .uk-column-divider {
-        -webkit-column-rule-color: $inverse-column-divider-rule-color;
-        -moz-column-rule-color: $inverse-column-divider-rule-color;
-        column-rule-color: $inverse-column-divider-rule-color;
-    }
+    .uk-column-divider { column-rule-color: $inverse-column-divider-rule-color; }
 
 }
 @mixin hook-comment(){}
@@ -690,7 +713,7 @@
 @mixin hook-description-list-description(){}
 @mixin hook-description-list-divider-term(){}
 @mixin hook-description-list-misc(){}
-@mixin svg-fill($src, $color-default, $color-new){
+@mixin svg-fill($src, $color-default, $color-new, $property: background-image){
 
     $escape-color-default:  escape($color-default) !default;
     $escape-color-new:  escape("#{$color-new}") !default;
@@ -698,17 +721,19 @@
     $data-uri:  data-uri('image/svg+xml;charset=UTF-8', "#{$src}") !default;
     $replace-src:  replace("#{$data-uri}", "#{$escape-color-default}", "#{$escape-color-new}", "g") !default;
 
-    background-image: unquote($replace-src);
+    #{$property}: unquote($replace-src);
 }
 @mixin hook-divider-icon(){}
 @mixin hook-divider-icon-line(){}
 @mixin hook-divider-icon-line-left(){}
 @mixin hook-divider-icon-line-right(){}
 @mixin hook-divider-small(){}
+@mixin hook-divider-vertical(){}
 @mixin hook-divider-misc(){}
 @mixin hook-inverse-divider-icon(){}
 @mixin hook-inverse-divider-icon-line(){}
 @mixin hook-inverse-divider-small(){}
+@mixin hook-inverse-divider-vertical(){}
 @mixin hook-inverse-component-divider(){
 
     .uk-divider-icon {
@@ -727,20 +752,26 @@
         @if(mixin-exists(hook-inverse-divider-small)) {@include hook-inverse-divider-small();}
     }
 
+    .uk-divider-vertical {
+        border-left-color: $inverse-divider-vertical-border;
+        @if(mixin-exists(hook-inverse-divider-vertical)) {@include hook-inverse-divider-vertical();}
+    }
+
 }
 @mixin hook-dotnav(){}
 @mixin hook-dotnav-item(){
-    -webkit-transition: background-color 0.2s ease-in-out;
-    transition: background-color 0.2s ease-in-out;
+    border: $dotnav-item-border-width solid $dotnav-item-border;
+    transition: 0.2s ease-in-out;
+    transition-property: background-color, border-color;
 }
-@mixin hook-dotnav-item-hover(){}
-@mixin hook-dotnav-item-onclick(){}
-@mixin hook-dotnav-item-active(){}
+@mixin hook-dotnav-item-hover(){ border-color: $dotnav-item-hover-border; }
+@mixin hook-dotnav-item-onclick(){ border-color: $dotnav-item-onclick-border; }
+@mixin hook-dotnav-item-active(){ border-color: $dotnav-item-active-border; }
 @mixin hook-dotnav-misc(){}
-@mixin hook-inverse-dotnav-item(){}
-@mixin hook-inverse-dotnav-item-hover(){}
-@mixin hook-inverse-dotnav-item-onclick(){}
-@mixin hook-inverse-dotnav-item-active(){}
+@mixin hook-inverse-dotnav-item(){ border-color: rgba($inverse-global-color, 0.9); }
+@mixin hook-inverse-dotnav-item-hover(){ border-color: transparent; }
+@mixin hook-inverse-dotnav-item-onclick(){ border-color: transparent; }
+@mixin hook-inverse-dotnav-item-active(){ border-color: transparent; }
 @mixin hook-inverse-component-dotnav(){
 
     .uk-dotnav > * > * {
@@ -781,9 +812,7 @@
 @mixin hook-form-range-misc(){}
 @mixin hook-form(){
     border: $form-border-width solid $form-border;
-    -webkit-transition: 0.2s ease-in-out;
     transition: 0.2s ease-in-out;
-    -webkit-transition-property: color, background-color, border;
     transition-property: color, background-color, border;
 }
 @mixin hook-form-single-line(){}
@@ -799,9 +828,7 @@
 }
 @mixin hook-form-radio(){
     border: $form-radio-border-width solid $form-radio-border;
-    -webkit-transition: 0.2s ease-in-out;
     transition: 0.2s ease-in-out;
-    -webkit-transition-property: background-color, border;
     transition-property: background-color, border;
 }
 @mixin hook-form-radio-focus(){ border-color: $form-radio-focus-border; }
@@ -844,19 +871,24 @@
     // Placeholder
     //
 
-    .uk-input:-ms-input-placeholder { color: $inverse-form-placeholder-color !important; }
-    .uk-input::-moz-placeholder { color: $inverse-form-placeholder-color; }
-    .uk-input::-webkit-input-placeholder { color: $inverse-form-placeholder-color; }
+    .uk-input::-ms-input-placeholder { color: $inverse-form-placeholder-color !important; }
+    .uk-input::placeholder { color: $inverse-form-placeholder-color; }
 
-    .uk-textarea:-ms-input-placeholder { color: $inverse-form-placeholder-color !important; }
-    .uk-textarea::-moz-placeholder { color: $inverse-form-placeholder-color; }
-    .uk-textarea::-webkit-input-placeholder { color: $inverse-form-placeholder-color; }
+    .uk-textarea::-ms-input-placeholder { color: $inverse-form-placeholder-color !important; }
+    .uk-textarea::placeholder { color: $inverse-form-placeholder-color; }
 
     //
-    // Radio and checkbox
+    // Select
     //
 
     .uk-select:not([multiple]):not([size]) { @include svg-fill($internal-form-select-image, "#000", $inverse-form-select-icon-color); }
+
+    //
+    // Datalist
+    //
+
+    .uk-input[list]:hover,
+    .uk-input[list]:focus { @include svg-fill($internal-form-datalist-image, "#000", $inverse-form-datalist-icon-color); }
 
     //
     // Radio and checkbox
@@ -900,6 +932,10 @@
         @if(mixin-exists(hook-inverse-form-label)) {@include hook-inverse-form-label();}
     }
 
+    // Icon
+    .uk-form-icon { color: $inverse-form-icon-color; }
+    .uk-form-icon:hover { color: $inverse-form-icon-hover-color; }
+
 }
 @mixin hook-grid-misc(){}
 @mixin hook-inverse-component-grid(){
@@ -908,12 +944,21 @@
     .uk-grid-divider.uk-grid-stack > .uk-grid-margin::before { border-top-color: $inverse-grid-divider-border; }
 
 }
+@mixin hook-heading-small(){}
+@mixin hook-heading-medium(){}
+@mixin hook-heading-large(){}
+@mixin hook-heading-xlarge(){}
+@mixin hook-heading-2xlarge(){}
 @mixin hook-heading-primary(){}
 @mixin hook-heading-hero(){}
 @mixin hook-heading-divider(){}
 @mixin hook-heading-bullet(){}
 @mixin hook-heading-line(){}
 @mixin hook-heading-misc(){}
+@mixin hook-inverse-heading-small(){}
+@mixin hook-inverse-heading-medium(){}
+@mixin hook-inverse-heading-large(){}
+@mixin hook-inverse-heading-xlarge(){}
 @mixin hook-inverse-heading-primary(){}
 @mixin hook-inverse-heading-hero(){}
 @mixin hook-inverse-heading-divider(){}
@@ -921,13 +966,29 @@
 @mixin hook-inverse-heading-line(){}
 @mixin hook-inverse-component-heading(){
 
-    .uk-heading-primary {
+    .uk-heading-small {
+        @if(mixin-exists(hook-inverse-heading-small)) {@include hook-inverse-heading-small();}
+    }
+
+    .uk-heading-medium {
+        @if(mixin-exists(hook-inverse-heading-medium)) {@include hook-inverse-heading-medium();}
+    }
+
+    .uk-heading-large {
+        @if(mixin-exists(hook-inverse-heading-large)) {@include hook-inverse-heading-large();}
+    }
+
+    .uk-heading-xlarge {
+        @if(mixin-exists(hook-inverse-heading-xlarge)) {@include hook-inverse-heading-xlarge();}
+    }
+
+    .uk-heading-2xlarge {
         @if(mixin-exists(hook-inverse-heading-primary)) {@include hook-inverse-heading-primary();}
     }
 
-    .uk-heading-hero {
-        @if(mixin-exists(hook-inverse-heading-hero)) {@include hook-inverse-heading-hero();}
-    }
+    @if ($deprecated == true) { .uk-heading-primary { @if (mixin-exists(hook-inverse-heading-primary)) {@include hook-inverse-heading-primary();}}}
+
+    @if ($deprecated == true) { .uk-heading-hero { @if (mixin-exists(hook-inverse-heading-hero)) {@include hook-inverse-heading-hero();}}}
 
     .uk-heading-divider {
         border-bottom-color: $inverse-heading-divider-border;
@@ -939,21 +1000,20 @@
         @if(mixin-exists(hook-inverse-heading-bullet)) {@include hook-inverse-heading-bullet();}
     }
 
-    .uk-heading-line > :before,
-    .uk-heading-line > :after {
+    .uk-heading-line > ::before,
+    .uk-heading-line > ::after {
         border-bottom-color: $inverse-heading-line-border;
         @if(mixin-exists(hook-inverse-heading-line)) {@include hook-inverse-heading-line();}
     }
 
 }
+@mixin hook-height-misc(){}
 @mixin hook-icon-link(){}
 @mixin hook-icon-link-hover(){}
 @mixin hook-icon-link-active(){}
 @mixin hook-icon-button(){
-    -webkit-transition: 0.1s ease-in-out;
     transition: 0.1s ease-in-out;
-    -webkit-transition-property: color, background-color;
-    transition-property: color, background-color
+    transition-property: color, background-color;
 }
 @mixin hook-icon-button-hover(){}
 @mixin hook-icon-button-active(){}
@@ -1021,18 +1081,18 @@
 @mixin hook-inverse-iconnav-item-active(){}
 @mixin hook-inverse-component-iconnav(){
 
-    .uk-iconnav > * > * {
+    .uk-iconnav > * > a {
         color: $inverse-iconnav-item-color;
         @if(mixin-exists(hook-inverse-iconnav-item)) {@include hook-inverse-iconnav-item();}
     }
 
-    .uk-iconnav > * > :hover,
-    .uk-iconnav > * > :focus {
+    .uk-iconnav > * > a:hover,
+    .uk-iconnav > * > a:focus {
         color: $inverse-iconnav-item-hover-color;
         @if(mixin-exists(hook-inverse-iconnav-item-hover)) {@include hook-inverse-iconnav-item-hover();}
     }
 
-    .uk-iconnav > .uk-active > * {
+    .uk-iconnav > .uk-active > a {
         color: $inverse-iconnav-item-active-color;
         @if(mixin-exists(hook-inverse-iconnav-item-active)) {@include hook-inverse-iconnav-item-active();}
     }
@@ -1040,22 +1100,28 @@
 }
 @mixin hook-inverse-component-link(){
 
-    a.uk-link-muted,
+    .uk-link-muted,
     .uk-link-muted a {
         color: $inverse-link-muted-color;
         @if(mixin-exists(hook-inverse-link-muted)) {@include hook-inverse-link-muted();}
     }
 
-    a.uk-link-muted:hover,
+    .uk-link-muted:hover,
     .uk-link-muted a:hover {
         color: $inverse-link-muted-hover-color;
         @if(mixin-exists(hook-inverse-link-muted-hover)) {@include hook-inverse-link-muted-hover();}
     }
 
-    a.uk-link-text:hover,
+    .uk-link-text:hover,
     .uk-link-text a:hover {
         color: $inverse-link-text-hover-color;
         @if(mixin-exists(hook-inverse-link-text-hover)) {@include hook-inverse-link-text-hover();}
+    }
+
+    .uk-link-heading:hover,
+    .uk-link-heading a:hover {
+        color: $inverse-link-heading-hover-color;
+        @if(mixin-exists(hook-inverse-link-heading-hover)) {@include hook-inverse-link-heading-hover();}
     }
 
 }
@@ -1115,8 +1181,7 @@
     .uk-search-input { color: $inverse-search-color; }
 
     .uk-search-input:-ms-input-placeholder { color: $inverse-search-placeholder-color !important; }
-    .uk-search-input::-moz-placeholder { color: $inverse-search-placeholder-color; }
-    .uk-search-input::-webkit-input-placeholder { color: $inverse-search-placeholder-color; }
+    .uk-search-input::placeholder { color: $inverse-search-placeholder-color; }
 
 
     //
@@ -1124,7 +1189,6 @@
     //
 
     .uk-search .uk-search-icon { color: $inverse-search-icon-color; }
-
     .uk-search .uk-search-icon:hover { color: $inverse-search-icon-color; }
 
     //
@@ -1214,6 +1278,8 @@
     .uk-nav-default .uk-nav-sub a:hover,
     .uk-nav-default .uk-nav-sub a:focus { color: $inverse-nav-default-sublist-item-hover-color; }
 
+    .uk-nav-default .uk-nav-sub li.uk-active > a { color: $inverse-nav-default-sublist-item-active-color; }
+
     //
     // Primary
     //
@@ -1248,6 +1314,8 @@
 
     .uk-nav-primary .uk-nav-sub a:hover,
     .uk-nav-primary .uk-nav-sub a:focus { color: $inverse-nav-primary-sublist-item-hover-color; }
+
+    .uk-nav-primary .uk-nav-sub li.uk-active > a { color: $inverse-nav-primary-sublist-item-active-color; }
 
 }
 @mixin hook-inverse-component-navbar(){
@@ -1442,7 +1510,9 @@
     }
 
     .uk-text-muted { color: $inverse-text-muted-color !important; }
+    .uk-text-emphasis { color: $inverse-text-emphasis-color !important; }
     .uk-text-primary { color: $inverse-text-primary-color !important; }
+    .uk-text-secondary { color: $inverse-text-secondary-color !important; }
 
 }
 @mixin hook-inverse-component-utility(){
@@ -1450,10 +1520,6 @@
     .uk-dropcap::first-letter,
     .uk-dropcap p:first-of-type::first-letter {
         @if(mixin-exists(hook-inverse-dropcap)) {@include hook-inverse-dropcap();}
-    }
-
-    .uk-leader-fill {
-        @if(mixin-exists(hook-inverse-leader)) {@include hook-inverse-leader();}
     }
 
     .uk-logo {
@@ -1510,6 +1576,16 @@
 @mixin hook-label-danger(){}
 @mixin hook-label-misc(){}
 @mixin hook-inverse-label(){}
+@mixin hook-leader(){}
+@mixin hook-leader-misc(){}
+@mixin hook-inverse-leader(){}
+@mixin hook-inverse-component-leader(){
+
+    .uk-leader-fill::after {
+        @if(mixin-exists(hook-inverse-leader)) {@include hook-inverse-leader();}
+    }
+
+}
 @mixin hook-lightbox(){}
 @mixin hook-lightbox-item(){}
 @mixin hook-lightbox-toolbar(){}
@@ -1522,11 +1598,14 @@
 @mixin hook-link-muted-hover(){}
 @mixin hook-link-text(){}
 @mixin hook-link-text-hover(){}
+@mixin hook-link-heading(){}
+@mixin hook-link-heading-hover(){}
 @mixin hook-link-reset(){}
 @mixin hook-link-misc(){}
 @mixin hook-inverse-link-muted(){}
 @mixin hook-inverse-link-muted-hover(){}
 @mixin hook-inverse-link-text-hover(){}
+@mixin hook-inverse-link-heading-hover(){}
 @mixin hook-list-divider(){}
 @mixin hook-list-striped(){
 
@@ -1624,9 +1703,7 @@
 @mixin hook-navbar-container(){}
 @mixin hook-navbar-nav-item(){
     text-transform: $navbar-nav-item-text-transform;
-    -webkit-transition: 0.1s ease-in-out;
     transition: 0.1s ease-in-out;
-    -webkit-transition-property: color, background-color;
     transition-property: color, background-color;
 }
 @mixin hook-navbar-nav-item-hover(){}
@@ -1638,6 +1715,7 @@
 @mixin hook-navbar-toggle-icon(){}
 @mixin hook-navbar-toggle-icon-hover(){}
 @mixin hook-navbar-subtitle(){}
+@mixin hook-navbar-primary(){}
 @mixin hook-navbar-transparent(){}
 @mixin hook-navbar-sticky(){}
 @mixin hook-navbar-dropdown(){ box-shadow: $navbar-dropdown-box-shadow; }
@@ -1714,10 +1792,7 @@
 @mixin hook-overlay-misc(){}
 @mixin hook-padding-misc(){}
 @mixin hook-pagination(){}
-@mixin hook-pagination-item(){
-    -webkit-transition: color 0.1s ease-in-out;
-    transition: color 0.1s ease-in-out;
-}
+@mixin hook-pagination-item(){ transition: color 0.1s ease-in-out; }
 @mixin hook-pagination-item-hover(){}
 @mixin hook-pagination-item-active(){}
 @mixin hook-pagination-item-disabled(){}
@@ -1726,9 +1801,9 @@
 @mixin hook-inverse-pagination-item-hover(){}
 @mixin hook-inverse-pagination-item-active(){}
 @mixin hook-inverse-pagination-item-disabled(){}
-@mixin hook-position-misc(){}
 @mixin hook-placeholder(){ border: $placeholder-border-width dashed $placeholder-border; }
 @mixin hook-placeholder-misc(){}
+@mixin hook-position-misc(){}
 @mixin hook-print(){}
 @mixin hook-progress(){
     border-radius: $progress-border-radius;
@@ -1755,22 +1830,23 @@
 @mixin hook-section-muted(){}
 @mixin hook-section-primary(){}
 @mixin hook-section-secondary(){}
-@mixin hook-section-media(){}
 @mixin hook-section-overlap(){}
 @mixin hook-section-misc(){}
-@mixin hook-slidenav(){
-    -webkit-transition: color 0.1s ease-in-out;
-    transition: color 0.1s ease-in-out;
-}
+@mixin hook-slidenav(){ transition: color 0.1s ease-in-out; }
 @mixin hook-slidenav-hover(){}
 @mixin hook-slidenav-active(){}
 @mixin hook-slidenav-previous(){}
 @mixin hook-slidenav-next(){}
+@mixin hook-slidenav-large(){}
 @mixin hook-slidenav-container(){}
 @mixin hook-slidenav-misc(){}
 @mixin hook-inverse-slidenav(){}
 @mixin hook-inverse-slidenav-hover(){}
 @mixin hook-inverse-slidenav-active(){}
+@mixin hook-slider(){}
+@mixin hook-slider-misc(){}
+@mixin hook-slideshow(){}
+@mixin hook-slideshow-misc(){}
 @mixin hook-sortable(){}
 @mixin hook-sortable-drag(){}
 @mixin hook-sortable-placeholder(){}
@@ -1783,9 +1859,7 @@
 @mixin hook-subnav-item(){
     font-size: $subnav-item-font-size;
     text-transform: $subnav-item-text-transform;
-    -webkit-transition: 0.1s ease-in-out;
     transition: 0.1s ease-in-out;
-    -webkit-transition-property: color, background-color;
     transition-property: color, background-color;
 }
 @mixin hook-subnav-item-hover(){}
@@ -1806,6 +1880,7 @@
 @mixin hook-inverse-subnav-pill-item-onclick(){}
 @mixin hook-inverse-subnav-pill-item-active(){}
 @mixin hook-inverse-subnav-item-disabled(){}
+@mixin hook-svg-misc(){}
 @mixin hook-switcher-misc(){}
 @mixin hook-tab(){
 
@@ -1825,7 +1900,6 @@
     border-bottom: $tab-item-border-width solid transparent;
     font-size: $tab-item-font-size;
     text-transform: $tab-item-text-transform;
-    -webkit-transition: color 0.1s ease-in-out;
     transition: color 0.1s ease-in-out;
 }
 @mixin hook-tab-item-hover(){}
@@ -1894,20 +1968,18 @@
 @mixin hook-table-cell(){}
 @mixin hook-table-footer(){}
 @mixin hook-table-caption(){}
-@mixin hook-table-row-active(){}
 @mixin hook-table-divider(){}
 @mixin hook-table-striped(){
     border-top: $table-striped-border-width solid $table-striped-border;
     border-bottom: $table-striped-border-width solid $table-striped-border;
 }
 @mixin hook-table-hover(){}
+@mixin hook-table-row-active(){}
 @mixin hook-table-small(){}
+@mixin hook-table-large(){}
 @mixin hook-table-misc(){
 
-    .uk-table tbody tr {
-        -webkit-transition: background-color 0.1s linear;
-        transition: background-color 0.1s linear;
-    }
+    .uk-table tbody tr { transition: background-color 0.1s linear; }
 
 }
 @mixin hook-inverse-table-header-cell(){}
@@ -1974,6 +2046,49 @@
 @mixin hook-text-misc(){}
 @mixin hook-inverse-text-lead(){}
 @mixin hook-inverse-text-meta(){}
+@mixin hook-thumbnav(){}
+@mixin hook-thumbnav-item(){
+
+    position: relative;
+
+    &::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: $thumbnav-item-background;
+        transition: background-color 0.1s ease-in-out;
+    }
+
+}
+@mixin hook-thumbnav-item-hover(){
+    &::after { background-color: $thumbnav-item-hover-background; }
+}
+@mixin hook-thumbnav-item-active(){
+    &::after { background-color: $thumbnav-item-active-background; }
+}
+@mixin hook-thumbnav-misc(){}
+@mixin hook-inverse-thumbnav-item(){}
+@mixin hook-inverse-thumbnav-item-hover(){}
+@mixin hook-inverse-thumbnav-item-active(){}
+@mixin hook-inverse-component-thumbnav(){
+
+    .uk-thumbnav > * > * {
+        @if(mixin-exists(hook-inverse-thumbnav-item)) {@include hook-inverse-thumbnav-item();}
+    }
+
+    .uk-thumbnav > * > :hover,
+    .uk-thumbnav > * > :focus {
+        @if(mixin-exists(hook-inverse-thumbnav-item-hover)) {@include hook-inverse-thumbnav-item-hover();}
+    }
+
+    .uk-thumbnav > .uk-active > * {
+        @if(mixin-exists(hook-inverse-thumbnav-item-active)) {@include hook-inverse-thumbnav-item-active();}
+    }
+
+}
 @mixin hook-tile(){}
 @mixin hook-tile-default(){}
 @mixin hook-tile-muted(){}
@@ -1982,10 +2097,7 @@
 @mixin hook-tile-misc(){}
 @mixin hook-tooltip(){}
 @mixin hook-tooltip-misc(){}
-@mixin hook-totop(){
-    -webkit-transition: color 0.1s ease-in-out;
-    transition: color 0.1s ease-in-out;
-}
+@mixin hook-totop(){ transition: color 0.1s ease-in-out; }
 @mixin hook-totop-hover(){}
 @mixin hook-totop-active(){}
 @mixin hook-totop-misc(){}
@@ -1999,12 +2111,10 @@
     // Prevent line wrap
     margin-bottom: -2px;
 }
-@mixin hook-leader(){}
 @mixin hook-logo(){}
 @mixin hook-logo-hover(){}
 @mixin hook-utility-misc(){}
 @mixin hook-inverse-dropcap(){}
-@mixin hook-inverse-leader(){}
 @mixin hook-inverse-logo(){}
 @mixin hook-inverse-logo-hover(){}
 @mixin hook-visibility-misc(){}

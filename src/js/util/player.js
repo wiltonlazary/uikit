@@ -1,6 +1,9 @@
-import { assign, isString, one, promise, toNode } from './index';
+import {attr} from './attr';
+import {once} from './event';
+import {Promise} from './promise';
+import {assign, includes, isString, noop, toNode} from './lang';
 
-var id = 0;
+let id = 0;
 
 export class Player {
 
@@ -22,7 +25,7 @@ export class Player {
     }
 
     isYoutube() {
-        return this.isIFrame() && !!this.el.src.match(/\/\/.*?youtube\.[a-z]+\/(watch\?v=[^&\s]+|embed)|youtu\.be\/.*/);
+        return this.isIFrame() && !!this.el.src.match(/\/\/.*?youtube(-nocookie)?\.[a-z]+\/(watch\?v=[^&\s]+|embed)|youtu\.be\/.*/);
     }
 
     isVimeo() {
@@ -35,15 +38,18 @@ export class Player {
             return this.ready;
         }
 
-        var youtube = this.isYoutube(), vimeo = this.isVimeo(), poller;
+        const youtube = this.isYoutube();
+        const vimeo = this.isVimeo();
+
+        let poller;
 
         if (youtube || vimeo) {
 
-            return this.ready = promise(resolve => {
+            return this.ready = new Promise(resolve => {
 
-                one(this.el, 'load', () => {
+                once(this.el, 'load', () => {
                     if (youtube) {
-                        var listener = () => post(this.el, {event: 'listening', id: this.id});
+                        const listener = () => post(this.el, {event: 'listening', id: this.id});
                         poller = setInterval(listener, 100);
                         listener();
                     }
@@ -55,13 +61,13 @@ export class Player {
                         poller && clearInterval(poller);
                     });
 
-                this.el.setAttribute('src', `${this.el.src}${~this.el.src.indexOf('?') ? '&' : '?'}${youtube ? 'enablejsapi=1' : `api=1&player_id=${id}`}`);
+                attr(this.el, 'src', `${this.el.src}${includes(this.el.src, '?') ? '&' : '?'}${youtube ? 'enablejsapi=1' : `api=1&player_id=${this.id}`}`);
 
             });
 
         }
 
-        return promise.resolve();
+        return Promise.resolve();
 
     }
 
@@ -72,9 +78,15 @@ export class Player {
         }
 
         if (this.isIFrame()) {
-            this.enableApi().then(() => post(this.el, {func: 'playVideo', method: 'play'}))
+            this.enableApi().then(() => post(this.el, {func: 'playVideo', method: 'play'}));
         } else if (this.isHTML5()) {
-            this.el.play();
+            try {
+                const promise = this.el.play();
+
+                if (promise) {
+                    promise.catch(noop);
+                }
+            } catch (e) {}
         }
     }
 
@@ -85,7 +97,7 @@ export class Player {
         }
 
         if (this.isIFrame()) {
-            this.enableApi().then(() => post(this.el, {func: 'pauseVideo', method: 'pause'}))
+            this.enableApi().then(() => post(this.el, {func: 'pauseVideo', method: 'pause'}));
         } else if (this.isHTML5()) {
             this.el.pause();
         }
@@ -98,10 +110,10 @@ export class Player {
         }
 
         if (this.isIFrame()) {
-            this.enableApi().then(() => post(this.el, {func: 'mute', method: 'setVolume', value: 0}))
+            this.enableApi().then(() => post(this.el, {func: 'mute', method: 'setVolume', value: 0}));
         } else if (this.isHTML5()) {
             this.el.muted = true;
-            this.el.setAttribute('muted', '');
+            attr(this.el, 'muted', '');
         }
 
     }
@@ -116,9 +128,9 @@ function post(el, cmd) {
 
 function listen(cb) {
 
-    return promise(resolve => {
+    return new Promise(resolve => {
 
-        one(window, 'message', (_, data) => resolve(data), false, ({data}) => {
+        once(window, 'message', (_, data) => resolve(data), false, ({data}) => {
 
             if (!data || !isString(data)) {
                 return;
@@ -126,7 +138,7 @@ function listen(cb) {
 
             try {
                 data = JSON.parse(data);
-            } catch(err) {
+            } catch (e) {
                 return;
             }
 

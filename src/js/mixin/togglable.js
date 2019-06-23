@@ -1,5 +1,4 @@
-import UIkit from '../api/index';
-import { $, $trigger, Animation, assign, Event, fastdom, isBoolean, isUndefined, noop, promise, Transition } from '../util/index';
+import {$$, Animation, assign, attr, css, fastdom, hasAttr, hasClass, height, includes, isBoolean, isFunction, isUndefined, isVisible, noop, Promise, toFloat, toggleClass, toNodes, Transition, trigger} from 'uikit-util';
 
 export default {
 
@@ -12,7 +11,7 @@ export default {
         queued: Boolean
     },
 
-    defaults: {
+    data: {
         cls: false,
         animation: [false],
         duration: 200,
@@ -42,12 +41,12 @@ export default {
 
     computed: {
 
-        hasAnimation() {
-            return !!this.animation[0];
+        hasAnimation({animation}) {
+            return !!animation[0];
         },
 
-        hasTransition() {
-            return this.hasAnimation && this.animation[0] === true;
+        hasTransition({animation}) {
+            return this.hasAnimation && animation[0] === true;
         }
 
     },
@@ -55,14 +54,15 @@ export default {
     methods: {
 
         toggleElement(targets, show, animate) {
-            return promise(resolve => {
+            return new Promise(resolve => {
 
-                targets = $(targets).toArray();
+                targets = toNodes(targets);
 
-                var all = targets => promise.all(targets.map(el => this._toggleElement(el, show, animate))),
-                    toggled = targets.filter(el => this.isToggled(el)),
-                    untoggled = targets.filter(el => !~toggled.indexOf(el)),
-                    p;
+                const all = targets => Promise.all(targets.map(el => this._toggleElement(el, show, animate)));
+                const toggled = targets.filter(el => this.isToggled(el));
+                const untoggled = targets.filter(el => !includes(toggled, el));
+
+                let p;
 
                 if (!this.queued || !isUndefined(animate) || !isUndefined(show) || !this.hasAnimation || targets.length < 2) {
 
@@ -70,17 +70,17 @@ export default {
 
                 } else {
 
-                    var body = document.body,
-                        scroll = body.scrollTop,
-                        el = toggled[0],
-                        inProgress = Animation.inProgress(el) && this.$hasClass(el, 'uk-animation-leave')
+                    const {body} = document;
+                    const scroll = body.scrollTop;
+                    const [el] = toggled;
+                    const inProgress = Animation.inProgress(el) && hasClass(el, 'uk-animation-leave')
                             || Transition.inProgress(el) && el.style.height === '0px';
 
                     p = all(toggled);
 
                     if (!inProgress) {
                         p = p.then(() => {
-                            var p = all(untoggled);
+                            const p = all(untoggled);
                             body.scrollTop = scroll;
                             return p;
                         });
@@ -94,124 +94,122 @@ export default {
         },
 
         toggleNow(targets, show) {
-            return promise(resolve => promise.all($(targets).toArray().map(el => this._toggleElement(el, show, false))).then(resolve, noop));
+            return new Promise(resolve => Promise.all(toNodes(targets).map(el => this._toggleElement(el, show, false))).then(resolve, noop));
         },
 
         isToggled(el) {
-            el = el && $(el) || this.$el;
-            return this.cls ? el.hasClass(this.cls.split(' ')[0]) : !el.attr('hidden');
+            const nodes = toNodes(el || this.$el);
+            return this.cls
+                ? hasClass(nodes, this.cls.split(' ')[0])
+                : !hasAttr(nodes, 'hidden');
         },
 
         updateAria(el) {
             if (this.cls === false) {
-                el.attr('aria-hidden', !this.isToggled(el));
+                attr(el, 'aria-hidden', !this.isToggled(el));
             }
         },
 
         _toggleElement(el, show, animate) {
 
-            el = $(el);
-
             show = isBoolean(show)
                 ? show
                 : Animation.inProgress(el)
-                    ? this.$hasClass(el, 'uk-animation-leave')
+                    ? hasClass(el, 'uk-animation-leave')
                     : Transition.inProgress(el)
-                        ? el[0].style.height === '0px'
+                        ? el.style.height === '0px'
                         : !this.isToggled(el);
 
-            if ($trigger(el, `before${show ? 'show' : 'hide'}`, [this]).result === false) {
-                return promise.reject();
+            if (!trigger(el, `before${show ? 'show' : 'hide'}`, [this])) {
+                return Promise.reject();
             }
 
-            var def = (animate === false || !this.hasAnimation
-                ? this._toggleImmediate
-                : this.hasTransition
-                    ? this._toggleHeight
-                    : this._toggleAnimation
+            const promise = (
+                isFunction(animate)
+                    ? animate
+                    : animate === false || !this.hasAnimation
+                        ? this._toggle
+                        : this.hasTransition
+                            ? toggleHeight(this)
+                            : toggleAnimation(this)
             )(el, show);
 
-            var e = Event(show ? 'show' : 'hide');
-            e.preventDefault(); // workaround for Prototype and MooTools: it keeps jQuery from calling show or hide on the Element itself
-            $trigger(el, e, [this]);
+            trigger(el, show ? 'show' : 'hide', [this]);
 
-            return def.then(() => {
-                $trigger(el, show ? 'shown' : 'hidden', [this]);
-                UIkit.update(null, el);
-            });
+            const final = () => {
+                trigger(el, show ? 'shown' : 'hidden', [this]);
+                this.$update(el);
+            };
+
+            return promise ? promise.then(final) : Promise.resolve(final());
         },
 
         _toggle(el, toggled) {
 
-            el = $(el);
-
-            if (this.cls) {
-                el.toggleClass(this.cls, ~this.cls.indexOf(' ') ? undefined : toggled);
-            } else {
-                el.attr('hidden', !toggled);
+            if (!el) {
+                return;
             }
 
-            el.find('[autofocus]:visible').focus();
+            toggled = Boolean(toggled);
+
+            let changed;
+            if (this.cls) {
+                changed = includes(this.cls, ' ') || toggled !== hasClass(el, this.cls);
+                changed && toggleClass(el, this.cls, includes(this.cls, ' ') ? undefined : toggled);
+            } else {
+                changed = toggled === hasAttr(el, 'hidden');
+                changed && attr(el, 'hidden', !toggled ? '' : null);
+            }
+
+            $$('[autofocus]', el).some(el => isVisible(el) ? el.focus() || true : el.blur());
 
             this.updateAria(el);
-            UIkit.update(null, el);
-        },
-
-        _toggleImmediate(el, show) {
-            this._toggle(el, show);
-            return promise.resolve();
-        },
-
-        _toggleHeight(el, show) {
-
-            var children = el.children(),
-                inProgress = Transition.inProgress(el),
-                inner = children.length ? parseFloat(children.first().css('margin-top')) + parseFloat(children.last().css('margin-bottom')) : 0,
-                height = el[0].offsetHeight ? el.height() + (inProgress ? 0 : inner) : 0,
-                endHeight;
-
-            Transition.cancel(el);
-
-            if (!this.isToggled(el)) {
-                this._toggle(el, true);
-            }
-
-            el.height('');
-
-            // Update child components first
-            fastdom.flush();
-
-            endHeight = el.height() + (inProgress ? 0 : inner);
-            el.height(height);
-
-            return (show
-                ? Transition.start(el, assign({}, this.initProps, {overflow: 'hidden', height: endHeight}), Math.round(this.duration * (1 - height / endHeight)), this.transition)
-                : Transition.start(el, this.hideProps, Math.round(this.duration * (height / endHeight)), this.transition).then(() => this._toggle(el, false))
-            ).then(() => el.css(this.initProps));
-
-        },
-
-        _toggleAnimation(el, show) {
-
-            if (Animation.inProgress(el)) {
-                return Animation.cancel(el).then(() => {
-
-                    if (Animation.inProgress(el)) {
-                        return promise.resolve().then(() => this._toggleAnimation(el, show));
-                    }
-
-                    return this._toggleAnimation(el, show);
-                });
-            }
-
-            if (show) {
-                this._toggle(el, true);
-                return Animation.in(el, this.animation[0], this.duration, this.origin);
-            }
-
-            return Animation.out(el, this.animation[1] || this.animation[0], this.duration, this.origin).then(() => this._toggle(el, false));
+            changed && this.$update(el);
         }
 
     }
 
 };
+
+function toggleHeight({isToggled, duration, initProps, hideProps, transition, _toggle}) {
+    return (el, show) => {
+
+        const inProgress = Transition.inProgress(el);
+        const inner = el.hasChildNodes ? toFloat(css(el.firstElementChild, 'marginTop')) + toFloat(css(el.lastElementChild, 'marginBottom')) : 0;
+        const currentHeight = isVisible(el) ? height(el) + (inProgress ? 0 : inner) : 0;
+
+        Transition.cancel(el);
+
+        if (!isToggled(el)) {
+            _toggle(el, true);
+        }
+
+        height(el, '');
+
+        // Update child components first
+        fastdom.flush();
+
+        const endHeight = height(el) + (inProgress ? 0 : inner);
+        height(el, currentHeight);
+
+        return (show
+                ? Transition.start(el, assign({}, initProps, {overflow: 'hidden', height: endHeight}), Math.round(duration * (1 - currentHeight / endHeight)), transition)
+                : Transition.start(el, hideProps, Math.round(duration * (currentHeight / endHeight)), transition).then(() => _toggle(el, false))
+        ).then(() => css(el, initProps));
+
+    };
+}
+
+function toggleAnimation({animation, duration, origin, _toggle}) {
+    return (el, show) => {
+
+        Animation.cancel(el);
+
+        if (show) {
+            _toggle(el, true);
+            return Animation.in(el, animation[0], duration, origin);
+        }
+
+        return Animation.out(el, animation[1] || animation[0], duration, origin).then(() => _toggle(el, false));
+    };
+}

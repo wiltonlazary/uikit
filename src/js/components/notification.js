@@ -1,124 +1,128 @@
-function plugin(UIkit) {
+import {append, apply, closest, css, pointerEnter, pointerLeave, remove, startsWith, toFloat, Transition, trigger} from 'uikit-util';
 
-    if (plugin.installed) {
-        return;
-    }
+const containers = {};
 
-    var {$, each, pointerEnter, pointerLeave, Transition} = UIkit.util;
-    var containers = {};
+export default {
 
-    UIkit.component('notification', {
+    functional: true,
 
-        functional: true,
+    args: ['message', 'status'],
 
-        args: ['message', 'status'],
+    data: {
+        message: '',
+        status: '',
+        timeout: 5000,
+        group: null,
+        pos: 'top-center',
+        clsClose: 'uk-notification-close',
+        clsMsg: 'uk-notification-message'
+    },
 
-        defaults: {
-            message: '',
-            status: '',
-            timeout: 5000,
-            group: null,
-            pos: 'top-center',
-            onClose: null,
-            clsClose: 'uk-notification-close',
-            clsMsg: 'uk-notification-message'
+    install,
+
+    computed: {
+
+        marginProp({pos}) {
+            return `margin${startsWith(pos, 'top') ? 'Top' : 'Bottom'}`;
         },
 
-        created() {
+        startProps() {
+            return {opacity: 0, [this.marginProp]: -this.$el.offsetHeight};
+        }
 
-            if (!containers[this.pos]) {
-                containers[this.pos] = $(`<div class="uk-notification uk-notification-${this.pos}"></div>`).appendTo(UIkit.container);
-            }
+    },
 
-            this.$mount($(
-                `<div class="${this.clsMsg}${this.status ? ` ${this.clsMsg}-${this.status}` : ''}">
+    created() {
+
+        if (!containers[this.pos]) {
+            containers[this.pos] = append(this.$container, `<div class="uk-notification uk-notification-${this.pos}"></div>`);
+        }
+
+        const container = css(containers[this.pos], 'display', 'block');
+
+        this.$mount(append(container,
+            `<div class="${this.clsMsg}${this.status ? ` ${this.clsMsg}-${this.status}` : ''}">
                     <a href="#" class="${this.clsClose}" data-uk-close></a>
                     <div>${this.message}</div>
                 </div>`
-            ).appendTo(containers[this.pos].show())[0]);
+        ));
 
-        },
+    },
 
-        ready() {
+    connected() {
 
-            var marginBottom = parseInt(this.$el.css('margin-bottom'), 10);
-
-            Transition.start(
-                this.$el.css({opacity: 0, marginTop: -1 * this.$el.outerHeight(), marginBottom: 0}),
-                {opacity: 1, marginTop: 0, marginBottom}
-            ).then(() => {
-                if (this.timeout) {
-                    this.timer = setTimeout(this.close, this.timeout);
-                }
-            });
-
-        },
-
-        events: {
-
-            click(e) {
-                if ($(e.target).closest('a[href="#"]').length) {
-                    e.preventDefault();
-                }
-                this.close();
-            },
-
-            [pointerEnter]() {
-                if (this.timer) {
-                    clearTimeout(this.timer);
-                }
-            },
-
-            [pointerLeave]() {
-                if (this.timeout) {
-                    this.timer = setTimeout(this.close, this.timeout);
-                }
+        const margin = toFloat(css(this.$el, this.marginProp));
+        Transition.start(
+            css(this.$el, this.startProps),
+            {opacity: 1, [this.marginProp]: margin}
+        ).then(() => {
+            if (this.timeout) {
+                this.timer = setTimeout(this.close, this.timeout);
             }
+        });
 
+    },
+
+    events: {
+
+        click(e) {
+            if (closest(e.target, 'a[href="#"],a[href=""]')) {
+                e.preventDefault();
+            }
+            this.close();
         },
 
-        methods: {
-
-            close(immediate) {
-
-                var remove = () => {
-
-                    this.onClose && this.onClose();
-                    this.$el.trigger('close', [this]).remove();
-
-                    if (!containers[this.pos].children().length) {
-                        containers[this.pos].hide();
-                    }
-
-                };
-
-                if (this.timer) {
-                    clearTimeout(this.timer);
-                }
-
-                if (immediate) {
-                    remove();
-                } else {
-                    Transition.start(this.$el, {opacity: 0, marginTop: -1 * this.$el.outerHeight(), marginBottom: 0}).then(remove)
-                }
+        [pointerEnter]() {
+            if (this.timer) {
+                clearTimeout(this.timer);
             }
+        },
 
+        [pointerLeave]() {
+            if (this.timeout) {
+                this.timer = setTimeout(this.close, this.timeout);
+            }
         }
 
-    });
+    },
 
-    UIkit.notification.closeAll = function (group, immediate) {
-        each(UIkit.instances, (_, component) => {
-            if (component.$options.name === 'notification' && (!group || group === component.group)) {
-                component.close(immediate);
+    methods: {
+
+        close(immediate) {
+
+            const removeFn = () => {
+
+                trigger(this.$el, 'close', [this]);
+                remove(this.$el);
+
+                if (!containers[this.pos].children.length) {
+                    css(containers[this.pos], 'display', 'none');
+                }
+
+            };
+
+            if (this.timer) {
+                clearTimeout(this.timer);
             }
-        })
+
+            if (immediate) {
+                removeFn();
+            } else {
+                Transition.start(this.$el, this.startProps).then(removeFn);
+            }
+        }
+
+    }
+
+};
+
+function install(UIkit) {
+    UIkit.notification.closeAll = function (group, immediate) {
+        apply(document.body, el => {
+            const notification = UIkit.getComponent(el, 'notification');
+            if (notification && (!group || group === notification.group)) {
+                notification.close(immediate);
+            }
+        });
     };
-
 }
-
-if (!BUNDLED && typeof window !== 'undefined' && window.UIkit) {
-    window.UIkit.use(plugin);
-}
-
-export default plugin;

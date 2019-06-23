@@ -1,133 +1,159 @@
-import { $, isInView } from '../util/index';
+import {$$, addClass, css, data, filter, isInView, Promise, removeClass, toggleClass, trigger} from 'uikit-util';
 
-export default function (UIkit) {
+export default {
 
-    UIkit.component('scrollspy', {
+    args: 'cls',
 
-        args: 'cls',
+    props: {
+        cls: String,
+        target: String,
+        hidden: Boolean,
+        offsetTop: Number,
+        offsetLeft: Number,
+        repeat: Boolean,
+        delay: Number
+    },
 
-        props: {
-            cls: 'list',
-            target: String,
-            hidden: Boolean,
-            offsetTop: Number,
-            offsetLeft: Number,
-            repeat: Boolean,
-            delay: Number
-        },
+    data: () => ({
+        cls: false,
+        target: false,
+        hidden: true,
+        offsetTop: 0,
+        offsetLeft: 0,
+        repeat: false,
+        delay: 0,
+        inViewClass: 'uk-scrollspy-inview'
+    }),
 
-        defaults: {
-            cls: ['uk-scrollspy-inview'],
-            target: false,
-            hidden: true,
-            offsetTop: 0,
-            offsetLeft: 0,
-            repeat: false,
-            delay: 0,
-            inViewClass: 'uk-scrollspy-inview'
-        },
+    computed: {
 
-        computed: {
+        elements({target}, $el) {
+            return target ? $$(target, $el) : [$el];
+        }
 
-            elements() {
-                return this.target && $(this.target, this.$el) || this.$el;
+    },
+
+    update: [
+
+        {
+
+            write() {
+                if (this.hidden) {
+                    css(filter(this.elements, `:not(.${this.inViewClass})`), 'visibility', 'hidden');
+                }
             }
 
         },
 
-        update: [
+        {
 
-            {
+            read({update}) {
 
-                write() {
-                    if (this.hidden) {
-                        this.elements.filter(`:not(.${this.inViewClass})`).css('visibility', 'hidden');
-                    }
+                if (!update) {
+                    return;
                 }
+
+                this.elements.forEach(el => {
+
+                    let state = el._ukScrollspyState;
+
+                    if (!state) {
+                        state = {cls: data(el, 'uk-scrollspy-class') || this.cls};
+                    }
+
+                    state.show = isInView(el, this.offsetTop, this.offsetLeft);
+                    el._ukScrollspyState = state;
+
+                });
 
             },
 
-            {
+            write(data) {
 
-                read() {
-                    this.elements.each((_, el) => {
+                // Let child components be applied at least once first
+                if (!data.update) {
+                    this.$emit();
+                    return data.update = true;
+                }
 
-                        if (!el._scrollspy) {
-                            var cls = $(el).attr('uk-scrollspy-class');
-                            el._scrollspy = {toggles: cls && cls.split(',') || this.cls};
-                        }
+                this.elements.forEach(el => {
 
-                        el._scrollspy.show = isInView(el, this.offsetTop, this.offsetLeft);
+                    const state = el._ukScrollspyState;
+                    const {cls} = state;
 
-                    });
-                },
+                    if (state.show && !state.inview && !state.queued) {
 
-                write() {
+                        const show = () => {
 
-                    var index = this.elements.length === 1 ? 1 : 0;
+                            css(el, 'visibility', '');
+                            addClass(el, this.inViewClass);
+                            toggleClass(el, cls);
 
-                    this.elements.each((i, el) => {
+                            trigger(el, 'inview');
 
-                        var $el = $(el), data = el._scrollspy, cls = data.toggles[i] || data.toggles[0];
+                            this.$update(el);
 
-                        if (data.show) {
+                            state.inview = true;
+                            state.abort && state.abort();
+                        };
 
-                            if (!data.inview && !data.timer) {
+                        if (this.delay) {
 
-                                var show = () => {
-                                    $el.css('visibility', '')
-                                        .addClass(this.inViewClass)
-                                        .toggleClass(cls)
-                                        .trigger('inview');
+                            state.queued = true;
+                            data.promise = (data.promise || Promise.resolve()).then(() => {
+                                return !state.inview && new Promise(resolve => {
 
-                                    this.$update();
+                                    const timer = setTimeout(() => {
 
-                                    data.inview = true;
-                                    delete data.timer;
-                                };
+                                        show();
+                                        resolve();
 
-                                if (this.delay && index) {
-                                    data.timer = setTimeout(show, this.delay * index);
-                                } else {
-                                    show();
-                                }
+                                    }, data.promise || this.elements.length === 1 ? this.delay : 0);
 
-                                index++;
+                                    state.abort = () => {
+                                        clearTimeout(timer);
+                                        resolve();
+                                        state.queued = false;
+                                    };
 
-                            }
+                                });
+
+                            });
 
                         } else {
-
-                            if (data.inview && this.repeat) {
-
-                                if (data.timer) {
-                                    clearTimeout(data.timer);
-                                    delete data.timer;
-                                }
-
-                                $el.removeClass(this.inViewClass)
-                                    .toggleClass(cls)
-                                    .css('visibility', this.hidden ? 'hidden' : '')
-                                    .trigger('outview');
-
-                                this.$update();
-
-                                data.inview = false;
-
-                            }
-
+                            show();
                         }
 
-                    });
+                    } else if (!state.show && (state.inview || state.queued) && this.repeat) {
 
-                },
+                        state.abort && state.abort();
 
-                events: ['scroll', 'load', 'resize']
+                        if (!state.inview) {
+                            return;
+                        }
 
-            }
+                        css(el, 'visibility', this.hidden ? 'hidden' : '');
+                        removeClass(el, this.inViewClass);
+                        toggleClass(el, cls);
 
-        ]
+                        trigger(el, 'outview');
 
-    });
+                        this.$update(el);
 
-}
+                        state.inview = false;
+
+                    }
+
+
+                });
+
+            },
+
+            events: ['scroll', 'resize']
+
+        }
+
+    ]
+
+};
+

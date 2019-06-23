@@ -1,145 +1,152 @@
-function plugin(UIkit) {
+import Class from '../mixin/class';
+import {$, empty, html} from 'uikit-util';
 
-    if (plugin.installed) {
-        return;
-    }
+export default {
 
-    UIkit.component('countdown', {
+    mixins: [Class],
 
-        mixins: [UIkit.mixin.class],
+    props: {
+        date: String,
+        clsWrapper: String
+    },
 
-        attrs: true,
+    data: {
+        date: '',
+        clsWrapper: '.uk-countdown-%unit%'
+    },
 
-        props: {
-            date: String,
-            clsWrapper: String
+    computed: {
+
+        date({date}) {
+            return Date.parse(date);
         },
 
-        defaults: {
-            date: '',
-            clsWrapper: '.uk-countdown-%unit%'
+        days({clsWrapper}, $el) {
+            return $(clsWrapper.replace('%unit%', 'days'), $el);
         },
 
-        computed: {
-
-            date() {
-                return Date.parse(this.$props.date);
-            },
-
-            days() {
-                return this.$el.find(this.clsWrapper.replace('%unit%', 'days'));
-            },
-
-            hours() {
-                return this.$el.find(this.clsWrapper.replace('%unit%', 'hours'));
-            },
-
-            minutes() {
-                return this.$el.find(this.clsWrapper.replace('%unit%', 'minutes'));
-            },
-
-            seconds() {
-                return this.$el.find(this.clsWrapper.replace('%unit%', 'seconds'));
-            },
-
-            units() {
-                return ['days', 'hours', 'minutes', 'seconds'].filter(unit => this[unit].length);
-            }
-
+        hours({clsWrapper}, $el) {
+            return $(clsWrapper.replace('%unit%', 'hours'), $el);
         },
 
-        connected() {
-            this.start();
+        minutes({clsWrapper}, $el) {
+            return $(clsWrapper.replace('%unit%', 'minutes'), $el);
         },
 
-        disconnected() {
-            this.stop();
-            this.units.forEach(unit => this[unit].empty());
+        seconds({clsWrapper}, $el) {
+            return $(clsWrapper.replace('%unit%', 'seconds'), $el);
         },
 
-        update: {
+        units() {
+            return ['days', 'hours', 'minutes', 'seconds'].filter(unit => this[unit]);
+        }
 
-            write() {
+    },
 
-                var timespan = getTimeSpan(this.date);
+    connected() {
+        this.start();
+    },
 
-                if (timespan.total <= 0) {
+    disconnected() {
+        this.stop();
+        this.units.forEach(unit => empty(this[unit]));
+    },
 
+    events: [
+
+        {
+
+            name: 'visibilitychange',
+
+            el: document,
+
+            handler() {
+                if (document.hidden) {
                     this.stop();
-
-                    timespan.days
-                        = timespan.hours
-                        = timespan.minutes
-                        = timespan.seconds
-                        = 0;
+                } else {
+                    this.start();
                 }
-
-                this.units.forEach(unit => {
-
-                    var digits = String(Math.floor(timespan[unit]));
-
-                    digits = digits.length < 2 ? `0${digits}` : digits;
-
-                    if (this[unit].text() !== digits) {
-                        var el = this[unit];
-                        digits = digits.split('');
-
-                        if (digits.length !== el.children().length) {
-                            el.empty().append(digits.map(() => '<span></span>').join(''));
-                        }
-
-                        digits.forEach((digit, i) => el[0].childNodes[i].innerText = digit);
-                    }
-
-                });
-
-            }
-
-        },
-
-        methods: {
-
-            start() {
-
-                this.stop();
-
-                if (this.date && this.units.length) {
-                    this.$emit();
-                    this.timer = setInterval(() => this.$emit(), 1000);
-                }
-
-            },
-
-            stop() {
-
-                if (this.timer) {
-                    clearInterval(this.timer);
-                    this.timer = null;
-                }
-
             }
 
         }
 
-    });
+    ],
 
-    function getTimeSpan(date) {
+    update: {
 
-        var total = date - Date.now();
+        write() {
 
-        return {
-            total,
-            seconds: total / 1000 % 60,
-            minutes: total / 1000 / 60 % 60,
-            hours: total / 1000 / 60 / 60 % 24,
-            days: total / 1000 / 60 / 60 / 24
-        };
+            const timespan = getTimeSpan(this.date);
+
+            if (timespan.total <= 0) {
+
+                this.stop();
+
+                timespan.days
+                    = timespan.hours
+                    = timespan.minutes
+                    = timespan.seconds
+                    = 0;
+            }
+
+            this.units.forEach(unit => {
+
+                let digits = String(Math.floor(timespan[unit]));
+
+                digits = digits.length < 2 ? `0${digits}` : digits;
+
+                const el = this[unit];
+                if (el.textContent !== digits) {
+                    digits = digits.split('');
+
+                    if (digits.length !== el.children.length) {
+                        html(el, digits.map(() => '<span></span>').join(''));
+                    }
+
+                    digits.forEach((digit, i) => el.children[i].textContent = digit);
+                }
+
+            });
+
+        }
+
+    },
+
+    methods: {
+
+        start() {
+
+            this.stop();
+
+            if (this.date && this.units.length) {
+                this.$emit();
+                this.timer = setInterval(() => this.$emit(), 1000);
+            }
+
+        },
+
+        stop() {
+
+            if (this.timer) {
+                clearInterval(this.timer);
+                this.timer = null;
+            }
+
+        }
+
     }
 
-}
+};
 
-if (!BUNDLED && typeof window !== 'undefined' && window.UIkit) {
-    window.UIkit.use(plugin);
-}
+function getTimeSpan(date) {
 
-export default plugin;
+    const total = date - Date.now();
+
+    return {
+        total,
+        seconds: total / 1000 % 60,
+        minutes: total / 1000 / 60 % 60,
+        hours: total / 1000 / 60 / 60 % 24,
+        days: total / 1000 / 60 / 60 / 24
+    };
+}

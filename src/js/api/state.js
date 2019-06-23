@@ -1,21 +1,20 @@
-import { assign, bind, camelize, coerce, getData, hasOwn, hyphenate, isArray, isJQuery, isPlainObject, isString, isUndefined, mergeOptions, Observer } from '../util/index';
+import {assign, bind, camelize, data as getData, hasOwn, hyphenate, isArray, isBoolean, isEmpty, isEqual, isFunction, isPlainObject, isString, isUndefined, mergeOptions, on, parseOptions, startsWith, toBoolean, toList, toNumber} from 'uikit-util';
 
 export default function (UIkit) {
 
-    var uid = 0;
-
-    UIkit.prototype.props = {};
+    let uid = 0;
 
     UIkit.prototype._init = function (options) {
 
         options = options || {};
-        options = this.$options = mergeOptions(this.constructor.options, options, this);
+        options.data = normalizeData(options, this.constructor.options);
 
+        this.$options = mergeOptions(this.constructor.options, options, this);
         this.$el = null;
-        this.$name = UIkit.prefix + hyphenate(this.$options.name);
         this.$props = {};
 
         this._frames = {reads: {}, writes: {}};
+        this._events = [];
 
         this._uid = uid++;
         this._initData();
@@ -30,34 +29,19 @@ export default function (UIkit) {
 
     UIkit.prototype._initData = function () {
 
-        var {defaults, data = {}, args = [], props = {}, el} = this.$options;
+        const {data = {}} = this.$options;
 
-        if (args.length && isArray(data)) {
-            data = data.slice(0, args.length).reduce((data, value, index) => {
-                if (isPlainObject(value)) {
-                    assign(data, value);
-                } else {
-                    data[args[index]] = value;
-                }
-                return data;
-            }, {});
-        }
-
-        for (var key in defaults) {
-            this.$props[key] = this[key] = hasOwn(data, key) && !isUndefined(data[key])
-                ? coerce(props[key], data[key], el)
-                : isArray(defaults[key])
-                    ? defaults[key].concat()
-                    : defaults[key];
+        for (const key in data) {
+            this.$props[key] = this[key] = data[key];
         }
     };
 
     UIkit.prototype._initMethods = function () {
 
-        var methods = this.$options.methods;
+        const {methods} = this.$options;
 
         if (methods) {
-            for (var key in methods) {
+            for (const key in methods) {
                 this[key] = bind(methods[key], this);
             }
         }
@@ -65,88 +49,125 @@ export default function (UIkit) {
 
     UIkit.prototype._initComputeds = function () {
 
-        var computed = this.$options.computed;
+        const {computed} = this.$options;
 
         this._computeds = {};
 
         if (computed) {
-            for (var key in computed) {
+            for (const key in computed) {
                 registerComputed(this, key, computed[key]);
             }
         }
     };
 
+    UIkit.prototype._callWatches = function () {
+
+        const {$options: {computed}, _computeds} = this;
+
+        for (const key in _computeds) {
+
+            const value = _computeds[key];
+            delete _computeds[key];
+
+            if (computed[key].watch && !isEqual(value, this[key])) {
+                computed[key].watch.call(this, this[key], value);
+            }
+
+        }
+
+    };
+
     UIkit.prototype._initProps = function (props) {
 
-        this._computeds = {};
-        assign(this.$props, props || getProps(this.$options, this.$name));
+        let key;
 
-        var exclude = [this.$options.computed, this.$options.methods];
-        for (var key in this.$props) {
-            if (notIn(exclude, key)) {
+        props = props || getProps(this.$options, this.$name);
+
+        for (key in props) {
+            if (!isUndefined(props[key])) {
+                this.$props[key] = props[key];
+            }
+        }
+
+        const exclude = [this.$options.computed, this.$options.methods];
+        for (key in this.$props) {
+            if (key in props && notIn(exclude, key)) {
                 this[key] = this.$props[key];
             }
         }
     };
 
-    UIkit.prototype._initEvents = function (unbind) {
+    UIkit.prototype._initEvents = function () {
 
-        var events = this.$options.events;
+        const {events} = this.$options;
 
         if (events) {
 
             events.forEach(event => {
 
                 if (!hasOwn(event, 'handler')) {
-                    for (var key in event) {
-                        registerEvent(this, unbind, event[key], key);
+                    for (const key in event) {
+                        registerEvent(this, event[key], key);
                     }
                 } else {
-                    registerEvent(this, unbind, event);
+                    registerEvent(this, event);
                 }
 
             });
         }
     };
 
+    UIkit.prototype._unbindEvents = function () {
+        this._events.forEach(unbind => unbind());
+        this._events = [];
+    };
+
     UIkit.prototype._initObserver = function () {
 
-        var {attrs, props, el} = this.$options;
-        if (this._observer || !props || !attrs || !Observer) {
+        let {attrs, props, el} = this.$options;
+        if (this._observer || !props || attrs === false) {
             return;
         }
 
-        attrs = isArray(attrs) ? attrs : Object.keys(props).map(key => hyphenate(key));
+        attrs = isArray(attrs) ? attrs : Object.keys(props);
 
-        this._observer = new Observer(() => {
+        this._observer = new MutationObserver(() => {
 
-            var data = getProps(this.$options, this.$name);
-            if (attrs.some(key => !equals(data[key], this.$props[key]))) {
-                this.$reset(data);
+            const data = getProps(this.$options, this.$name);
+            if (attrs.some(key => !isUndefined(data[key]) && data[key] !== this.$props[key])) {
+                this.$reset();
             }
 
         });
 
-        this._observer.observe(el, {attributes: true, attributeFilter: attrs.concat([this.$name, `data-${this.$name}`])});
+        const filter = attrs.map(key => hyphenate(key)).concat(this.$name);
+
+        this._observer.observe(el, {
+            attributes: true,
+            attributeFilter: filter.concat(filter.map(key => `data-${key}`))
+        });
     };
 
     function getProps(opts, name) {
 
-        var data = {},
-            {args = [], props = {}, el} = opts,
-            key, prop;
+        const data = {};
+        const {args = [], props = {}, el} = opts;
 
         if (!props) {
             return data;
         }
 
-        for (key in props) {
-            prop = hyphenate(key);
-            if (el.hasAttribute(prop)) {
+        for (const key in props) {
+            const prop = hyphenate(key);
+            let value = getData(el, prop);
 
-                var value = coerce(props[key], el.getAttribute(prop), el);
+            if (!isUndefined(value)) {
 
-                if (prop === 'target' && (!value || value.lastIndexOf('_', 0) === 0)) {
+                value = props[key] === Boolean && value === ''
+                    ? true
+                    : coerce(props[key], value);
+
+                if (prop === 'target' && (!value || startsWith(value, '_'))) {
                     continue;
                 }
 
@@ -154,40 +175,16 @@ export default function (UIkit) {
             }
         }
 
-        var options = parseOptions(getData(el, name), args);
+        const options = parseOptions(getData(el, name), args);
 
-        for (key in options) {
-            prop = camelize(key);
+        for (const key in options) {
+            const prop = camelize(key);
             if (props[prop] !== undefined) {
-                data[prop] = coerce(props[prop], options[key], el);
+                data[prop] = coerce(props[prop], options[key]);
             }
         }
 
         return data;
-    }
-
-    function parseOptions(options, args = []) {
-
-        try {
-
-            return !options
-                ? {}
-                : options[0] === '{'
-                    ? JSON.parse(options)
-                    : args.length && !~options.indexOf(':')
-                        ? ({[args[0]]: options})
-                        : options.split(';').reduce((options, option) => {
-                            var [key, value] = option.split(/:(.+)/);
-                            if (key && value) {
-                                options[key.trim()] = value.trim();
-                            }
-                            return options;
-                        }, {});
-
-        } catch (e) {
-            return {};
-        }
-
     }
 
     function registerComputed(component, key, cb) {
@@ -197,72 +194,126 @@ export default function (UIkit) {
 
             get() {
 
-                if (!hasOwn(component._computeds, key)) {
-                    component._computeds[key] = cb.call(component);
+                const {_computeds, $props, $el} = component;
+
+                if (!hasOwn(_computeds, key)) {
+                    _computeds[key] = (cb.get || cb).call(component, $props, $el);
                 }
 
-                return component._computeds[key];
+                return _computeds[key];
             },
 
             set(value) {
-                component._computeds[key] = value;
+
+                const {_computeds} = component;
+
+                _computeds[key] = cb.set ? cb.set.call(component, value) : value;
+
+                if (isUndefined(_computeds[key])) {
+                    delete _computeds[key];
+                }
             }
 
         });
     }
 
-    function registerEvent(component, unbind, event, key) {
+    function registerEvent(component, event, key) {
 
         if (!isPlainObject(event)) {
             event = ({name: key, handler: event});
         }
 
-        var {name, el, delegate, self, filter, handler} = event,
-            namespace = `.${component.$options.name}.${component._uid}`;
+        let {name, el, handler, capture, passive, delegate, filter, self} = event;
+        el = isFunction(el)
+            ? el.call(component)
+            : el || component.$el;
 
-        el = el && el.call(component) || component.$el;
-
-        name = name.split(' ').map(name => `${name}.${namespace}`).join(' ');
-
-        if (unbind) {
-
-            el.off(name);
-
-        } else {
-
-            if (filter && !filter.call(component)) {
-                return;
-            }
-
-            handler = isString(handler) ? component[handler] : bind(handler, component);
-
-            if (self) {
-                handler = selfFilter(handler, component);
-            }
-
-            if (delegate) {
-                el.on(name, isString(delegate) ? delegate : delegate.call(component), handler);
-            } else {
-                el.on(name, handler);
-            }
+        if (isArray(el)) {
+            el.forEach(el => registerEvent(component, assign({}, event, {el}), key));
+            return;
         }
+
+        if (!el || filter && !filter.call(component)) {
+            return;
+        }
+
+        handler = detail(isString(handler) ? component[handler] : bind(handler, component));
+
+        if (self) {
+            handler = selfFilter(handler);
+        }
+
+        component._events.push(
+            on(
+                el,
+                name,
+                !delegate
+                    ? null
+                    : isString(delegate)
+                        ? delegate
+                        : delegate.call(component),
+                handler,
+                isBoolean(passive)
+                    ? {passive, capture}
+                    : capture
+            )
+        );
 
     }
 
-    function selfFilter(handler, context) {
+    function selfFilter(handler) {
         return function selfHandler(e) {
-            if (e.target === e.currentTarget) {
-                return handler.call(context, e)
+            if (e.target === e.currentTarget || e.target === e.current) {
+                return handler.call(null, e);
             }
-        }
+        };
     }
 
     function notIn(options, key) {
         return options.every(arr => !arr || !hasOwn(arr, key));
     }
 
-    function equals(a, b) {
-        return isUndefined(a) || a === b || isJQuery(a) && isJQuery(b) && a.is(b);
+    function detail(listener) {
+        return e => isArray(e.detail) ? listener(...[e].concat(e.detail)) : listener(e);
     }
 
+    function coerce(type, value) {
+
+        if (type === Boolean) {
+            return toBoolean(value);
+        } else if (type === Number) {
+            return toNumber(value);
+        } else if (type === 'list') {
+            return toList(value);
+        }
+
+        return type ? type(value) : value;
+    }
+
+    function normalizeData({data, el}, {args, props = {}}) {
+        data = isArray(data)
+            ? !isEmpty(args)
+                ? data.slice(0, args.length).reduce((data, value, index) => {
+                    if (isPlainObject(value)) {
+                        assign(data, value);
+                    } else {
+                        data[args[index]] = value;
+                    }
+                    return data;
+                }, {})
+                : undefined
+            : data;
+
+        if (data) {
+            for (const key in data) {
+                if (isUndefined(data[key])) {
+                    delete data[key];
+                } else {
+                    data[key] = props[key] ? coerce(props[key], data[key], el) : data[key];
+                }
+            }
+        }
+
+        return data;
+    }
 }

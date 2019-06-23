@@ -1,72 +1,60 @@
-import { Class } from '../mixin/index';
-import { Dimensions, Player } from '../util/index';
+import Video from './video';
+import Class from '../mixin/class';
+import {css, Dimensions, isVisible} from 'uikit-util';
 
-export default function (UIkit) {
+export default {
 
-    UIkit.component('cover', {
+    mixins: [Class, Video],
 
-        mixins: [Class],
+    props: {
+        width: Number,
+        height: Number
+    },
 
-        props: {
-            width: Number,
-            height: Number
-        },
+    data: {
+        automute: true
+    },
 
-        computed: {
+    update: {
 
-            el() {
-                return this.$el[0];
-            },
+        read() {
 
-            parent() {
-                return this.el.parentNode;
+            const el = this.$el;
+
+            if (!isVisible(el)) {
+                return false;
             }
 
+            const {offsetHeight: height, offsetWidth: width} = el.parentNode;
+
+            return {height, width};
         },
 
-        ready() {
+        write({height, width}) {
 
-            if (this.$el.is('iframe')) {
-                this.$el.css('pointerEvents', 'none');
+            const el = this.$el;
+            const elWidth = this.width || el.naturalWidth || el.videoWidth || el.clientWidth;
+            const elHeight = this.height || el.naturalHeight || el.videoHeight || el.clientHeight;
+
+            if (!elWidth || !elHeight) {
+                return;
             }
 
-            var player = new Player(this.$el);
-
-            if (player.isVideo()) {
-                player.mute();
-            }
-
-        },
-
-        update: {
-
-            write() {
-
-                if (this.el.offsetHeight === 0) {
-                    return;
+            css(el, Dimensions.cover(
+                {
+                    width: elWidth,
+                    height: elHeight
+                },
+                {
+                    width: width + (width % 2 ? 1 : 0),
+                    height: height + (height % 2 ? 1 : 0)
                 }
-
-                this.$el
-                    .css({width: '', height: ''})
-                    .css(Dimensions.cover(
-                        {width: this.width || this.el.clientWidth, height: this.height || this.el.clientHeight},
-                        {width: this.parent.offsetWidth, height: this.parent.offsetHeight}
-                    ));
-
-            },
-
-            events: ['load', 'resize']
+            ));
 
         },
 
-        events: {
+        events: ['resize']
 
-            loadedmetadata() {
-                this.$emit();
-            }
+    }
 
-        }
-
-    });
-
-}
+};

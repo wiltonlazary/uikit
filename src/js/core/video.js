@@ -1,53 +1,65 @@
-import { Player } from '../util/index';
+import {css, hasAttr, isInView, isVisible, Player} from 'uikit-util';
 
-export default function (UIkit) {
+export default {
 
-    UIkit.component('video', {
+    args: 'autoplay',
 
-        props: {
-            automute: Boolean,
-            autoplay: Boolean,
+    props: {
+        automute: Boolean,
+        autoplay: Boolean
+    },
+
+    data: {
+        automute: false,
+        autoplay: true
+    },
+
+    computed: {
+
+        inView({autoplay}) {
+            return autoplay === 'inview';
+        }
+
+    },
+
+    connected() {
+
+        if (this.inView && !hasAttr(this.$el, 'preload')) {
+            this.$el.preload = 'none';
+        }
+
+        this.player = new Player(this.$el);
+
+        if (this.automute) {
+            this.player.mute();
+        }
+
+    },
+
+    update: {
+
+        read() {
+
+            return !this.player
+                ? false
+                : {
+                    visible: isVisible(this.$el) && css(this.$el, 'visibility') !== 'hidden',
+                    inView: this.inView && isInView(this.$el)
+                };
         },
 
-        defaults: {automute: false, autoplay: true},
+        write({visible, inView}) {
 
-        computed: {
-
-            el() {
-                return this.$el[0];
+            if (!visible || this.inView && !inView) {
+                this.player.pause();
+            } else if (this.autoplay === true || this.inView && inView) {
+                this.player.play();
             }
 
         },
 
-        ready() {
-            this.player = new Player(this.el);
+        events: ['resize', 'scroll']
 
-            if (this.automute) {
-                this.player.mute();
-            }
+    }
 
-        },
-
-        update: {
-
-            write() {
-
-                if (!this.player || !this.autoplay) {
-                    return;
-                }
-
-                if (this.el.offsetHeight === 0 || this.$el.css('visibility') === 'hidden') {
-                    this.player.pause();
-                } else {
-                    this.player.play();
-                }
-
-            },
-
-            events: ['load']
-
-        },
-
-    });
-
-}
+};

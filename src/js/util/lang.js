@@ -1,72 +1,82 @@
-import $, { isNumeric } from 'jquery';
-import { getCssVar, hasPromise, isJQuery, query } from './index';
-
-export { $ };
-export { ajax, each, Event, isNumeric } from 'jquery';
-
 export function bind(fn, context) {
     return function (a) {
-        var l = arguments.length;
+        const l = arguments.length;
         return l ? l > 1 ? fn.apply(context, arguments) : fn.call(context, a) : fn.call(context);
     };
 }
 
-var hasOwnProperty = Object.prototype.hasOwnProperty;
+const objPrototype = Object.prototype;
+const {hasOwnProperty} = objPrototype;
+
 export function hasOwn(obj, key) {
     return hasOwnProperty.call(obj, key);
 }
 
-export function promise(executor) {
-
-    if (hasPromise) {
-        return new Promise(executor);
-    }
-
-    var def = $.Deferred();
-
-    executor(def.resolve, def.reject);
-
-    return def;
-}
-
-promise.resolve = function (value) {
-    return promise(function (resolve) {
-        resolve(value);
-    });
-};
-
-promise.reject = function (value) {
-    return promise(function (_, reject) {
-        reject(value);
-    });
-};
-
-promise.all = function (iterable) {
-    return hasPromise
-        ? Promise.all(iterable)
-        : $.when.apply($, iterable);
-};
-
-export function classify(str) {
-    return str.replace(/(?:^|[-_\/])(\w)/g, (_, c) => c ? c.toUpperCase() : '');
-}
+const hyphenateCache = {};
+const hyphenateRe = /([a-z\d])([A-Z])/g;
 
 export function hyphenate(str) {
-    return str
-        .replace(/([a-z\d])([A-Z])/g, '$1-$2')
-        .toLowerCase()
+
+    if (!(str in hyphenateCache)) {
+        hyphenateCache[str] = str
+            .replace(hyphenateRe, '$1-$2')
+            .toLowerCase();
+    }
+
+    return hyphenateCache[str];
 }
 
-const camelizeRE = /-(\w)/g;
+const camelizeRe = /-(\w)/g;
+
 export function camelize(str) {
-    return str.replace(camelizeRE, toUpper)
+    return str.replace(camelizeRe, toUpper);
 }
 
 function toUpper(_, c) {
-    return c ? c.toUpperCase() : ''
+    return c ? c.toUpperCase() : '';
 }
 
-export const isArray = Array.isArray;
+export function ucfirst(str) {
+    return str.length ? toUpper(null, str.charAt(0)) + str.slice(1) : '';
+}
+
+const strPrototype = String.prototype;
+const startsWithFn = strPrototype.startsWith || function (search) { return this.lastIndexOf(search, 0) === 0; };
+
+export function startsWith(str, search) {
+    return startsWithFn.call(str, search);
+}
+
+const endsWithFn = strPrototype.endsWith || function (search) { return this.substr(-search.length) === search; };
+
+export function endsWith(str, search) {
+    return endsWithFn.call(str, search);
+}
+
+const arrPrototype = Array.prototype;
+
+const includesFn = function (search, i) { return ~this.indexOf(search, i); };
+const includesStr = strPrototype.includes || includesFn;
+const includesArray = arrPrototype.includes || includesFn;
+
+export function includes(obj, search) {
+    return obj && (isString(obj) ? includesStr : includesArray).call(obj, search);
+}
+
+const findIndexFn = arrPrototype.findIndex || function (predicate) {
+    for (let i = 0; i < this.length; i++) {
+        if (predicate.call(arguments[1], this[i], i, this)) {
+            return i;
+        }
+    }
+    return -1;
+};
+
+export function findIndex(array, predicate) {
+    return findIndexFn.call(array, predicate);
+}
+
+export const {isArray} = Array;
 
 export function isFunction(obj) {
     return typeof obj === 'function';
@@ -77,7 +87,28 @@ export function isObject(obj) {
 }
 
 export function isPlainObject(obj) {
-    return isObject(obj) && Object.getPrototypeOf(obj) === Object.prototype;
+    return isObject(obj) && Object.getPrototypeOf(obj) === objPrototype;
+}
+
+export function isWindow(obj) {
+    return isObject(obj) && obj === obj.window;
+}
+
+export function isDocument(obj) {
+    return isObject(obj) && obj.nodeType === 9;
+}
+
+export function isJQuery(obj) {
+    return isObject(obj) && !!obj.jquery;
+}
+
+export function isNode(obj) {
+    return obj instanceof Node || isObject(obj) && obj.nodeType >= 1;
+}
+
+const {toString} = objPrototype;
+export function isNodeCollection(obj) {
+    return toString.call(obj).match(/^\[object (NodeList|HTMLCollection)\]$/);
 }
 
 export function isBoolean(value) {
@@ -92,53 +123,21 @@ export function isNumber(value) {
     return typeof value === 'number';
 }
 
+export function isNumeric(value) {
+    return isNumber(value) || isString(value) && !isNaN(value - parseFloat(value));
+}
+
+export function isEmpty(obj) {
+    return !(isArray(obj)
+        ? obj.length
+        : isObject(obj)
+            ? Object.keys(obj).length
+            : false
+    );
+}
+
 export function isUndefined(value) {
-    return value === undefined;
-}
-
-export function isContextSelector(selector) {
-    return isString(selector) && selector.match(/^[!>+-]/);
-}
-
-export function getContextSelectors(selector) {
-    return isContextSelector(selector) && selector.split(/(?=\s[!>+-])/g).map(value => value.trim());
-}
-
-const contextSelectors = {'!': 'closest', '+': 'nextAll', '-': 'prevAll'};
-export function toJQuery(element, context) {
-
-    if (element === true) {
-        return null;
-    }
-
-    try {
-
-        if (context && isContextSelector(element) && element[0] !== '>') {
-
-            var fn = contextSelectors[element[0]], selector = element.substr(1);
-
-            context = $(context);
-
-            if (fn === 'closest') {
-                context = context.parent();
-                selector = selector || '*';
-            }
-
-            element = context[fn](selector);
-
-        } else {
-            element = $(element, context);
-        }
-
-    } catch (e) {
-        return null;
-    }
-
-    return element.length ? element : null;
-}
-
-export function toNode(element) {
-    return element && (isJQuery(element) ? element[0] : element);
+    return value === void 0;
 }
 
 export function toBoolean(value) {
@@ -152,72 +151,74 @@ export function toBoolean(value) {
 }
 
 export function toNumber(value) {
-    var number = Number(value);
+    const number = Number(value);
     return !isNaN(number) ? number : false;
+}
+
+export function toFloat(value) {
+    return parseFloat(value) || 0;
+}
+
+export function toNode(element) {
+    return isNode(element) || isWindow(element) || isDocument(element)
+        ? element
+        : isNodeCollection(element) || isJQuery(element)
+            ? element[0]
+            : isArray(element)
+                ? toNode(element[0])
+                : null;
+}
+
+export function toNodes(element) {
+    return isNode(element)
+        ? [element]
+        : isNodeCollection(element)
+            ? arrPrototype.slice.call(element)
+            : isArray(element)
+                ? element.map(toNode).filter(Boolean)
+                : isJQuery(element)
+                    ? element.toArray()
+                    : [];
 }
 
 export function toList(value) {
     return isArray(value)
         ? value
         : isString(value)
-            ? value.split(',').map(value => isNumeric(value)
+            ? value.split(/,(?![^(]*\))/).map(value => isNumeric(value)
                 ? toNumber(value)
                 : toBoolean(value.trim()))
             : [value];
 }
 
-var vars = {};
-export function toMedia(value) {
-
-    if (isString(value)) {
-        if (value[0] === '@') {
-            var name = `media-${value.substr(1)}`;
-            value = vars[name] || (vars[name] = parseFloat(getCssVar(name)));
-        } else if (isNaN(value)) {
-            return value;
-        }
-    }
-
-    return value && !isNaN(value) ? `(min-width: ${value}px)` : false;
-}
-
-export function coerce(type, value, context) {
-
-    if (type === Boolean) {
-        return toBoolean(value);
-    } else if (type === Number) {
-        return toNumber(value);
-    } else if (type === 'jQuery') {
-        return query(value, context);
-    } else if (type === 'list') {
-        return toList(value);
-    } else if (type === 'media') {
-        return toMedia(value);
-    }
-
-    return type ? type(value) : value;
-}
-
 export function toMs(time) {
     return !time
         ? 0
-        : time.substr(-2) === 'ms'
-            ? parseFloat(time)
-            : parseFloat(time) * 1000;
+        : endsWith(time, 'ms')
+            ? toFloat(time)
+            : toFloat(time) * 1000;
+}
+
+export function isEqual(value, other) {
+    return value === other
+        || isObject(value)
+        && isObject(other)
+        && Object.keys(value).length === Object.keys(other).length
+        && each(value, (val, key) => val === other[key]);
 }
 
 export function swap(value, a, b) {
-    return value.replace(new RegExp(`${a}|${b}`, 'mg'), function (match) {
-        return match === a ? b : a
+    return value.replace(new RegExp(`${a}|${b}`, 'mg'), match => {
+        return match === a ? b : a;
     });
 }
 
 export const assign = Object.assign || function (target, ...args) {
     target = Object(target);
-    for (var i = 0; i < args.length; i++) {
-        var source = args[i];
+    for (let i = 0; i < args.length; i++) {
+        const source = args[i];
         if (source !== null) {
-            for (var key in source) {
+            for (const key in source) {
                 if (hasOwn(source, key)) {
                     target[key] = source[key];
                 }
@@ -227,8 +228,85 @@ export const assign = Object.assign || function (target, ...args) {
     return target;
 };
 
+export function each(obj, cb) {
+    for (const key in obj) {
+        if (false === cb(obj[key], key)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+export function sortBy(array, prop) {
+    return array.sort(({[prop]: propA = 0}, {[prop]: propB = 0}) =>
+        propA > propB
+            ? 1
+            : propB > propA
+                ? -1
+                : 0
+    );
+}
+
+export function uniqueBy(array, prop) {
+    const seen = new Set();
+    return array.filter(({[prop]: check}) => seen.has(check)
+        ? false
+        : seen.add(check) || true // IE 11 does not return the Set object
+    );
+}
+
 export function clamp(number, min = 0, max = 1) {
-    return Math.min(Math.max(number, min), max);
+    return Math.min(Math.max(toNumber(number) || 0, min), max);
 }
 
 export function noop() {}
+
+export function intersectRect(r1, r2) {
+    return r1.left < r2.right &&
+        r1.right > r2.left &&
+        r1.top < r2.bottom &&
+        r1.bottom > r2.top;
+}
+
+export function pointInRect(point, rect) {
+    return point.x <= rect.right &&
+        point.x >= rect.left &&
+        point.y <= rect.bottom &&
+        point.y >= rect.top;
+}
+
+export const Dimensions = {
+
+    ratio(dimensions, prop, value) {
+
+        const aProp = prop === 'width' ? 'height' : 'width';
+
+        return {
+            [aProp]: dimensions[prop] ? Math.round(value * dimensions[aProp] / dimensions[prop]) : dimensions[aProp],
+            [prop]: value
+        };
+    },
+
+    contain(dimensions, maxDimensions) {
+        dimensions = assign({}, dimensions);
+
+        each(dimensions, (_, prop) => dimensions = dimensions[prop] > maxDimensions[prop]
+            ? this.ratio(dimensions, prop, maxDimensions[prop])
+            : dimensions
+        );
+
+        return dimensions;
+    },
+
+    cover(dimensions, maxDimensions) {
+        dimensions = this.contain(dimensions, maxDimensions);
+
+        each(dimensions, (_, prop) => dimensions = dimensions[prop] < maxDimensions[prop]
+            ? this.ratio(dimensions, prop, maxDimensions[prop])
+            : dimensions
+        );
+
+        return dimensions;
+    }
+
+};
